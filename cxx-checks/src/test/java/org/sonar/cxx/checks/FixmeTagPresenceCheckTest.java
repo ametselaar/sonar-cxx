@@ -24,6 +24,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.sonar.cxx.CxxAstScanner;
 import org.sonar.squid.api.SourceFile;
+import org.sonar.squid.api.AnalysisException;
 
 import java.io.File;
 
@@ -34,6 +35,7 @@ public class FixmeTagPresenceCheckTest {
 
   @Test
   public void detected() {
+	  try {
     SourceFile file = CxxAstScanner.scanSingleFile(new File("src/test/resources/checks/FixmeTagPresenceCheck.cc"), new FixmeTagPresenceCheck());
     checkMessagesVerifier.verify(file.getCheckMessages())
       .next().atLine(3).withMessage("Take the required action to fix the issue indicated by this comment.")
@@ -41,6 +43,19 @@ public class FixmeTagPresenceCheckTest {
       .next().atLine(8)
       .next().atLine(11)
       .next().atLine(13);
+	  }
+	  catch (AnalysisException e) {
+		  System.err.println(" -- outer exception -- ");
+		  System.err.println(e.getMessage());
+		  e.printStackTrace(System.err);
+		  Throwable cause = e.getCause();
+		  if (cause != null) {
+			  System.err.println(" -- cause -- ");
+			  System.err.println(cause.getMessage());
+			  cause.printStackTrace(System.err);			  
+		  }
+		  throw e;
+	  }
   }
 
 }

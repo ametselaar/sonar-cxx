@@ -36,7 +36,7 @@ import com.sonar.sslr.api.Grammar;
 
 public class NoSonarCheck extends SquidCheck<Grammar> implements AstAndTokenVisitor {
 
-  @Override
+  //@Override
   public void visitToken(Token token) {
     for (Trivia trivia : token.getTrivia()) {
       if (trivia.isComment()) {

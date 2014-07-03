@@ -30,6 +30,7 @@ import org.sonar.api.measures.CoreMetrics;
 import org.sonar.api.measures.PersistenceMode;
 import org.sonar.api.measures.RangeDistributionBuilder;
 import org.sonar.api.profiles.RulesProfile;
+import org.sonar.api.resources.Method;
 import org.sonar.api.resources.Project;
 import org.sonar.api.rules.Violation;
 import org.sonar.cxx.CxxAstScanner;
@@ -37,6 +38,7 @@ import org.sonar.cxx.CxxConfiguration;
 import org.sonar.cxx.api.CxxMetric;
 import org.sonar.cxx.checks.CheckList;
 import org.sonar.plugins.cxx.CxxLanguage;
+import org.sonar.plugins.cxx.CxxMetrics;
 import org.sonar.plugins.cxx.CxxPlugin;
 import org.sonar.squid.api.CheckMessage;
 import org.sonar.squid.api.SourceCode;
@@ -44,8 +46,12 @@ import org.sonar.squid.api.SourceFile;
 import org.sonar.squid.api.SourceFunction;
 import org.sonar.squid.indexer.QueryByParent;
 import org.sonar.squid.indexer.QueryByType;
+
 import com.sonar.sslr.api.Grammar;
+
 import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.Arrays;
@@ -57,6 +63,7 @@ import java.util.Locale;
  * {@inheritDoc}
  */
 public final class CxxSquidSensor implements Sensor {
+	  private static Logger LOG = LoggerFactory.getLogger("CxxSquidSensor");
   private static final Number[] FUNCTIONS_DISTRIB_BOTTOM_LIMITS = {1, 2, 4, 6, 8, 10, 12, 20, 30};
   private static final Number[] FILES_DISTRIB_BOTTOM_LIMITS = {0, 5, 10, 20, 30, 60, 90};
 
@@ -72,6 +79,7 @@ public final class CxxSquidSensor implements Sensor {
    * {@inheritDoc}
    */
   public CxxSquidSensor(RulesProfile profile, Settings conf, ModuleFileSystem fs) {
+	    LOG.info("CxxSquidSensor::CxxSquidSensor");
     this.annotationCheckFactory = AnnotationCheckFactory.create(profile, CheckList.REPOSITORY_KEY, CheckList.getChecks());
     this.conf = conf;
     this.fs = fs;
@@ -88,8 +96,10 @@ public final class CxxSquidSensor implements Sensor {
     this.project = project;
     this.context = context;
 
+    LOG.info("CxxSquidSensor::analyse");
     Collection<SquidAstVisitor<Grammar>> squidChecks = annotationCheckFactory.getChecks();
     List<SquidAstVisitor<Grammar>> visitors = Lists.newArrayList(squidChecks);
+    visitors.add(new CxxFileLogger());
     this.scanner = CxxAstScanner.create(createConfiguration(project, conf),
                                         visitors.toArray(new SquidAstVisitor[visitors.size()]));
 
@@ -126,6 +136,7 @@ public final class CxxSquidSensor implements Sensor {
   }
 
   private void saveMeasures(org.sonar.api.resources.File sonarFile, SourceFile squidFile) {
+    LOG.debug("Save measures for " + sonarFile.getKey());
     context.saveMeasure(sonarFile, CoreMetrics.FILES, squidFile.getDouble(CxxMetric.FILES));
     context.saveMeasure(sonarFile, CoreMetrics.LINES, squidFile.getDouble(CxxMetric.LINES));
     context.saveMeasure(sonarFile, CoreMetrics.NCLOC, squidFile.getDouble(CxxMetric.LINES_OF_CODE));
@@ -135,9 +146,25 @@ public final class CxxSquidSensor implements Sensor {
     context.saveMeasure(sonarFile, CoreMetrics.COMPLEXITY, squidFile.getDouble(CxxMetric.COMPLEXITY));
     context.saveMeasure(sonarFile, CoreMetrics.COMMENT_BLANK_LINES, squidFile.getDouble(CxxMetric.COMMENT_BLANK_LINES));
     context.saveMeasure(sonarFile, CoreMetrics.COMMENT_LINES, squidFile.getDouble(CxxMetric.COMMENT_LINES));
+    // save some measures on function level
+    Collection<SourceCode> squidFunctionsInFile = scanner.getIndex().search(new QueryByParent(squidFile), new QueryByType(SourceFunction.class));
+    for (SourceCode squidFunction : squidFunctionsInFile) {
+      String key = sonarFile.getKey() + "#" +  squidFunction.getKey();
+      Method sonarFunction = Method.createMethod(key, sonarFile.getLanguage());
+      if ( context.index(sonarFunction, sonarFile) ) {
+        LOG.debug("  Save measures for " + key);
+        context.saveMeasure(sonarFunction, CoreMetrics.NCLOC, squidFunction.getDouble(CxxMetric.LINES_OF_CODE));
+        context.saveMeasure(sonarFunction, CoreMetrics.COMPLEXITY, squidFunction.getDouble(CxxMetric.COMPLEXITY));
+        context.saveMeasure(sonarFunction, CxxMetrics.PARAM_COUNT, squidFunction.getDouble(CxxMetric.PARAMETER_COUNT));
+      }
+      else {
+          LOG.warn("  Failed to index " + key);
+      }
+    }    
   }
 
   private void saveFunctionsComplexityDistribution(org.sonar.api.resources.File sonarFile, SourceFile squidFile) {
+	LOG.debug("Save complexitydistribution for " + sonarFile.getKey());
     Collection<SourceCode> squidFunctionsInFile = scanner.getIndex().search(new QueryByParent(squidFile), new QueryByType(SourceFunction.class));
     RangeDistributionBuilder complexityDistribution = new RangeDistributionBuilder(CoreMetrics.FUNCTION_COMPLEXITY_DISTRIBUTION, FUNCTIONS_DISTRIB_BOTTOM_LIMITS);
     for (SourceCode squidFunction : squidFunctionsInFile) {
