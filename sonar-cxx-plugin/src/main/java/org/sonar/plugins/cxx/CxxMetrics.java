@@ -30,6 +30,7 @@ import org.sonar.api.measures.Metric;
 import org.sonar.api.measures.SumChildValuesFormula;
 import org.sonar.api.rules.Rule;
 import org.sonar.api.rules.XMLRuleParser;
+import org.sonar.plugins.cxx.valgrind.CxxValgrindRuleRepository;
 
 public final class CxxMetrics implements org.sonar.api.measures.Metrics {
 	public static final Metric PARAM_COUNT = new Metric.Builder("cxx-parameter-count", "Parameter count", Metric.ValueType.INT)
@@ -81,5 +82,5 @@ public final class CxxMetrics implements org.sonar.api.measures.Metrics {
 	public static Metric findMetric(String section, String key) {
 		String subKey = section + "-" + key;
         return otherMetrics.get(subKey);
-	}
+	}	
 }

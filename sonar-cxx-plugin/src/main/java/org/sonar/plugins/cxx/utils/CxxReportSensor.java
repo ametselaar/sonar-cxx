@@ -23,6 +23,7 @@ import org.apache.tools.ant.DirectoryScanner;
 import org.sonar.api.batch.Sensor;
 import org.sonar.api.batch.SensorContext;
 import org.sonar.api.config.Settings;
+import org.sonar.api.measures.Metric;
 import org.sonar.api.resources.Project;
 import org.sonar.api.rules.Rule;
 import org.sonar.api.rules.RuleFinder;
@@ -37,6 +38,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
+
 import org.sonar.api.resources.Resource;
 
 /**
@@ -49,6 +52,15 @@ public abstract class CxxReportSensor implements Sensor {
   private HashSet<String> uniqueIssues = new HashSet<String>();
   private HashMap<String, Rule> ruleCache = new HashMap<String, Rule>();
   protected ModuleFileSystem fs;
+  private class AdditiveMeasure {
+	  public Metric metric;
+	  public double value;
+	  public AdditiveMeasure(Metric metric, double value) {
+		  this.metric = metric;
+		  this.value = value;
+	  }
+  }
+  private HashMap<Resource, ArrayList<AdditiveMeasure> > measures = new HashMap<Resource, ArrayList<AdditiveMeasure> >();
 
   /**
    * {@inheritDoc}
@@ -93,6 +105,13 @@ public abstract class CxxReportSensor implements Sensor {
       if (reports.isEmpty()) {
         handleNoReportsCase(context);
       }
+      
+      for (Entry<Resource, ArrayList<AdditiveMeasure>> entry: measures.entrySet()){
+    	  for (AdditiveMeasure m : entry.getValue()) {
+    		  context.saveMeasure(entry.getKey(), m.metric, m.value);
+    	  }
+      }
+      measures = new HashMap<Resource, ArrayList<AdditiveMeasure>>();
     } catch (Exception e) {
       String msg = new StringBuilder()
           .append("Cannot feed the data into sonar, details: '")
@@ -164,31 +183,13 @@ public abstract class CxxReportSensor implements Sensor {
    */
   public boolean saveViolation(Project project, SensorContext context, String ruleRepoKey,
     String filename, String line, String ruleId, String msg) {
-    boolean add = false;
-    Resource resource = null;
+    Resource resource = findResource(project, context, filename, line);
+    boolean add = (resource != null);
     int lineNr = 0;
 
-    if ((filename != null) && (filename.length() > 0)) { // file level
-      String normalPath = CxxUtils.normalizePath(filename);
-      if (normalPath != null) {
-        if (!notFoundFiles.contains(normalPath)) {
-          org.sonar.api.resources.File file
-            = org.sonar.api.resources.File.fromIOFile(new File(normalPath), project);
-          if (context.getResource(file) != null) {
-            lineNr = getLineAsInt(line);
-            resource = file;
-            add = true;
-          } else {
-            CxxUtils.LOG.warn("Cannot find the file '{}', skipping violations", normalPath);
-            notFoundFiles.add(normalPath);
-          }
-        }
-      }
-    } else { // project level
-      resource = project;
-      add = true;
+    if (add && (resource != project)) {
+    	lineNr = getLineAsInt(line);
     }
-
     if (add) {
       Rule rule = getRule(ruleRepoKey, ruleId);
       if (rule != null) {
@@ -198,7 +199,57 @@ public abstract class CxxReportSensor implements Sensor {
 
     return add;
   }
+  
+  protected void addToMeasure(Resource resource, Metric metric, double delta) {
+	  ArrayList<AdditiveMeasure> m = null;
+	  if (measures.containsKey(resource)) {
+		  m = measures.get(resource);
+		  boolean done = false;
+		  for (int i=0 ; i < m.size(); i++) {
+			  if (m.get(i).metric == metric) {
+				  m.get(i).value += delta;
+				  done = true;
+				  break;
+			  }
+		  }
+		  if (!done) {
+			  m.add(new AdditiveMeasure(metric, delta));
+		  }
+	  }
+	  else {
+		  m = new ArrayList<AdditiveMeasure> ();
+		  m.add(new AdditiveMeasure(metric, delta));
+	  }
+	  measures.put(resource, m);	  
+  }
 
+  /**
+   * Find the Resource corresponding to the given file/line.  and has
+   * given ruleId and message. When file is null, project will be returned, if line is null
+   * the Resource returned corresponds to the file as a whole. 
+   * @todo Find resources below file level.
+   */
+  public Resource findResource(Project project, SensorContext context, String filename, String line)  {
+	  Resource resource = null;
+	  if ((filename != null) && (filename.length() > 0)) { // file level
+		  String normalPath = CxxUtils.normalizePath(filename);
+		  if (normalPath != null) {
+			  if (!notFoundFiles.contains(normalPath)) {
+				  org.sonar.api.resources.File file
+				  = org.sonar.api.resources.File.fromIOFile(new File(normalPath), project);
+				  resource = context.getResource(file);
+				  if ( resource == null) {
+					  CxxUtils.LOG.warn("Cannot find the file '{}', skipping violations", normalPath);
+					  notFoundFiles.add(normalPath);
+				  }
+			  }
+		  }
+	  } else { // project level
+		  resource = project;
+	  }
+	  return resource;
+  }
+  
   private void contextSaveViolation(SensorContext context, Resource resource, int lineNr, Rule rule, String msg) {
     Violation violation = Violation.create(rule, resource);
     if (lineNr > 0) {

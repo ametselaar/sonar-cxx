@@ -21,9 +21,12 @@ package org.sonar.plugins.cxx.valgrind;
 
 import org.sonar.api.batch.SensorContext;
 import org.sonar.api.config.Settings;
+import org.sonar.api.measures.Metric;
 import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Project;
+import org.sonar.api.resources.Resource;
 import org.sonar.api.rules.RuleFinder;
+import org.sonar.plugins.cxx.CxxMetrics;
 import org.sonar.plugins.cxx.utils.CxxReportSensor;
 import org.sonar.plugins.cxx.utils.CxxUtils;
 import org.sonar.api.scan.filesystem.ModuleFileSystem;
@@ -72,6 +75,7 @@ public class CxxValgrindSensor extends CxxReportSensor {
   {
     ValgrindReportParser parser = new ValgrindReportParser();
     saveErrors(project, context, parser.parseReport(report));
+    addToMeasure(project, CxxMetrics.VALGRIND_RUNS, 1.0);
   }
 
   void saveErrors(Project project, SensorContext context, Set<ValgrindError> valgrindErrors) {
@@ -80,6 +84,14 @@ public class CxxValgrindSensor extends CxxReportSensor {
       if (frame != null) {
         saveUniqueViolation(project, context, CxxValgrindRuleRepository.KEY,
                             frame.getPath(), frame.getLine(), error.getKind(), error.toString());
+        Resource resource = findResource(project, context, frame.getPath(), frame.getLine());
+        if (resource != null) {
+        	Metric m = CxxMetrics.findMetric(CxxValgrindRuleRepository.KEY, error.getKind());
+        	if (m != null) {
+        	    addToMeasure(resource, m, 1.0);
+        	}
+        	addToMeasure(resource, CxxMetrics.VALGRIND_ERRORS, 1.0);
+        }
       }
       else{
         CxxUtils.LOG.warn("Cannot find a project file to assign the valgrind error '{}' to", error);
