@@ -17,16 +17,18 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02
  */
-package org.sonar.plugins.cxx;
+package org.sonar.plugins.cxx.squid;
 
-import org.junit.Test;
+import java.util.LinkedList;
 
-import static org.junit.Assert.assertEquals;
+import com.sonar.sslr.api.AstNode;
 
-public class CxxPluginTest {
-  @Test
-  public void testGetExtensions() throws Exception {
-    CxxPlugin plugin = new CxxPlugin();
-    assertEquals(57, plugin.getExtensions().size());
-  }
+public class CxxSymbol {
+	private AstNode declaration;
+	private AstNode templateArgs[];
+	public CxxSymbol(AstNode node, LinkedList<AstNode> templateContext) {
+		declaration = node;
+		templateArgs = templateContext.toArray(new AstNode[0]);
+	}
+
 }

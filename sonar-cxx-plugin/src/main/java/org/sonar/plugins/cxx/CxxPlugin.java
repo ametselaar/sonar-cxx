@@ -60,6 +60,7 @@ public final class CxxPlugin extends SonarPlugin {
   public static final String INCLUDE_DIRECTORIES_KEY = "sonar.cxx.includeDirectories";
   public static final String ERROR_RECOVERY_KEY = "sonar.cxx.errorRecoveryEnabled";
   public static final String FORCE_INCLUDE_FILES_KEY = "sonar.cxx.forceIncludes";
+  public static final String INCLUDE_DIRECTORIES_PARSE_KEY = "sonar.cxx.includeDirectoriesToParse";
 
   public static List<PropertyDefinition> generalProperties() {
     String subcateg = "(1) General";
@@ -106,6 +107,17 @@ public final class CxxPlugin extends SonarPlugin {
       .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
       .type(PropertyType.TEXT)
       .index(5)
+      .build(),
+
+      PropertyDefinition.builder(INCLUDE_DIRECTORIES_PARSE_KEY)
+      .defaultValue("")
+      .name("Include directories with parsing")
+      .description("Comma-separated list of directories with include files that should be fully parsed instead of scanned for defines only. "
+    		  + "This setting has no effect on the search path for include files.")
+      .subCategory(subcateg)
+      .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
+      .type(PropertyType.TEXT)
+      .index(6)
       .build(),
 
       PropertyDefinition.builder(CxxPlugin.ERROR_RECOVERY_KEY)

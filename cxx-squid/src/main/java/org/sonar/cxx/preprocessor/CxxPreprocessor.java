@@ -29,10 +29,12 @@ import com.sonar.sslr.api.Trivia;
 import com.sonar.sslr.impl.Lexer;
 import com.sonar.sslr.impl.Parser;
 import com.sonar.sslr.squid.SquidAstVisitorContext;
+
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonar.cxx.CxxConfiguration;
+
 import com.sonar.sslr.api.Grammar;
 
 import org.sonar.cxx.lexer.CxxLexer;
@@ -117,6 +119,7 @@ public class CxxPreprocessor extends Preprocessor {
   private Parser<Grammar> pplineParser = null;
   private MapChain<String, Macro> macros = new MapChain<String, Macro>();
   private Set<File> analysedFiles = new HashSet<File>();
+  private LinkedList<File> includeToParse = new LinkedList<File>();
   private SourceCodeProvider codeProvider = new SourceCodeProvider();
   private SquidAstVisitorContext<Grammar> context;
   private ExpressionEvaluator ifExprEvaluator;
@@ -143,6 +146,27 @@ public class CxxPreprocessor extends Preprocessor {
     codeProvider.setIncludeRoots(conf.getIncludeDirectories(), conf.getBaseDir());
 
     pplineParser = CppParser.create(conf);
+    
+    for (String tmp : conf.getIncludeDirectoriesToParse()) {
+        File includeRoot = new File(tmp);
+        if (!includeRoot.isAbsolute()) {
+          includeRoot = new File(conf.getBaseDir(), tmp);
+        }
+
+        try {
+          includeRoot = includeRoot.getCanonicalFile();
+        } catch (java.io.IOException io) {
+          LOG.error("cannot get canonical form of: '{}'", includeRoot);
+        }
+
+        if (includeRoot.isDirectory()) {
+          LOG.debug("Fully parse headers below: '{}'", includeRoot);
+          this.includeToParse.add(includeRoot);
+        }
+        else {
+          LOG.warn("the include root {} doesn't exist.", includeRoot.getAbsolutePath());
+        }
+    }
 
     try {
       macros.setHighPrio(true);
@@ -406,7 +430,7 @@ public class CxxPreprocessor extends Preprocessor {
     // b) extract the filename out of the include body and try to find it
     // c) if not done yet, process it using a special lexer, which calls back only
     //    if it finds relevant preprocessor directives (currently: include's and define's)
-
+    List<Token> result = new ArrayList<Token>();
     File includedFile = findIncludedFile(ast, token, filename);
     if (includedFile == null) {
       LOG.warn("[{}:{}]: cannot find the sources for '{}'", new Object[] {filename, token.getLine(), token.getValue()});
@@ -418,9 +442,21 @@ public class CxxPreprocessor extends Preprocessor {
 
       stateStack.push(state);
       state = new State(includedFile);
-
+      boolean parseFully = false;
+      for (File dir : includeToParse) {
+    	  if (includedFile.getPath().startsWith(dir.getPath())) {
+    		  parseFully = true;
+    		  break;
+    	  }
+      }
       try {
-        IncludeLexer.create(this).lex(codeProvider.getSourceCode(includedFile));
+    	  if (parseFully) {
+    		  result = CxxLexer.create(this).lex(codeProvider.getSourceCode(includedFile));
+    		  result = stripEOF(result);
+          } 
+    	  else {
+              IncludeLexer.create(this).lex(codeProvider.getSourceCode(includedFile));
+    	  }
       } finally {
         state = stateStack.pop();
       }
@@ -429,7 +465,7 @@ public class CxxPreprocessor extends Preprocessor {
       LOG.debug("[{}:{}]: skipping already included file '{}'", new Object[] {filename, token.getLine(), includedFile});
     }
 
-    return new PreprocessorAction(1, Lists.newArrayList(Trivia.createSkippedText(token)), new ArrayList<Token>());
+    return new PreprocessorAction(1, new ArrayList<Trivia>(), result);
   }
 
   PreprocessorAction handleUndefLine(AstNode ast, Token token, String filename) {
@@ -467,7 +503,6 @@ public class CxxPreprocessor extends Preprocessor {
 
       if (tokensConsumed > 0) {
         replTokens = reallocate(replTokens, curr);
-
         LOG.trace("[{}:{}]: replacing '" + curr.getValue()
           + (arguments.isEmpty()
               ? ""

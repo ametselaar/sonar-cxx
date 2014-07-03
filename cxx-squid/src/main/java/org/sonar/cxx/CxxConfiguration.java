@@ -31,6 +31,7 @@ public class CxxConfiguration extends SquidConfiguration {
   private boolean ignoreHeaderComments = false;
   private List<String> defines = new ArrayList<String>();
   private List<String> includeDirectories = new ArrayList<String>();
+  private List<String> includeDirectoriesToParse = new ArrayList<String>();
   private List<String> forceIncludeFiles = new ArrayList<String>();
   private String baseDir;
   private boolean errorRecoveryEnabled = true;
@@ -92,6 +93,20 @@ public class CxxConfiguration extends SquidConfiguration {
     return forceIncludeFiles;
   }
 
+  public List<String> getIncludeDirectoriesToParse() {
+	return includeDirectoriesToParse;
+  }
+
+  public void setIncludeDirectoriesToParse(List<String> includeDirectoriesToParse) {
+	this.includeDirectoriesToParse = includeDirectoriesToParse;
+  }
+
+  public void setIncludeDirectoriesToParse(String[] stringArray) {
+	if (stringArray != null) {
+		this.setIncludeDirectoriesToParse(Arrays.asList(stringArray));
+	}	
+  }
+  
   public void setBaseDir(String baseDir) {
     this.baseDir = baseDir;
   }
@@ -107,4 +122,5 @@ public class CxxConfiguration extends SquidConfiguration {
   public boolean getErrorRecoveryEnabled(){
     return this.errorRecoveryEnabled;
   }
+
 }
