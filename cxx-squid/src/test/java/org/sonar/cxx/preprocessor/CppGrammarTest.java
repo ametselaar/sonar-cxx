@@ -19,13 +19,13 @@
  */
 package org.sonar.cxx.preprocessor;
 
-import com.sonar.sslr.impl.events.ExtendedStackTrace;
-import com.sonar.sslr.impl.events.ExtendedStackTraceStream;
-import com.sonar.sslr.api.AstNode;
-import com.sonar.sslr.impl.Parser;
-import org.junit.Test;
 import static org.sonar.sslr.tests.Assertions.assertThat;
+
+import org.junit.Test;
+
+import com.sonar.sslr.api.AstNode;
 import com.sonar.sslr.api.Grammar;
+import com.sonar.sslr.impl.Parser;
 
 
 public class CppGrammarTest {
@@ -229,6 +229,9 @@ public class CppGrammarTest {
     assertThat(p).matches("#include /**/ <ace/config-all.h>");
     assertThat(p).matches("#include <math.h> /**/ /**/");
     assertThat(p).matches("#include USER_CONFIG");
+    assertThat(p).matches("#include macro(a,b,c)");
+    assertThat(p).matches("#include BOOST_PP_STRINGIZE(boost/mpl/aux_/preprocessed/AUX778076_PREPROCESSED_HEADER)");
+    assertThat(p).matches("#include BOOST_PP_TUPLE_ELEM_2(0,10,<boost/utility/detail/result_of_iterate.hpp>,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
   }
 
   @Test

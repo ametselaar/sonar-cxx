@@ -19,14 +19,18 @@
  */
 package org.sonar.plugins.cxx;
 
-import org.sonar.api.Extension;
-import org.sonar.api.Properties;
-import org.sonar.api.Property;
-import org.sonar.api.config.PropertyDefinition;
-import org.sonar.api.config.PropertyFieldDefinition;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.sonar.api.PropertyType;
 import org.sonar.api.SonarPlugin;
+import org.sonar.api.config.PropertyDefinition;
 import org.sonar.api.resources.Qualifiers;
+import org.sonar.plugins.cxx.compiler.CxxCompilerGccParser;
+import org.sonar.plugins.cxx.compiler.CxxCompilerGccRuleRepository;
+import org.sonar.plugins.cxx.compiler.CxxCompilerSensor;
+import org.sonar.plugins.cxx.compiler.CxxCompilerVcParser;
+import org.sonar.plugins.cxx.compiler.CxxCompilerVcRuleRepository;
 import org.sonar.plugins.cxx.coverage.CxxCoverageSensor;
 import org.sonar.plugins.cxx.cppcheck.CxxCppCheckRuleRepository;
 import org.sonar.plugins.cxx.cppcheck.CxxCppCheckSensor;
@@ -34,11 +38,6 @@ import org.sonar.plugins.cxx.externalrules.CxxExternalRuleRepository;
 import org.sonar.plugins.cxx.externalrules.CxxExternalRulesSensor;
 import org.sonar.plugins.cxx.pclint.CxxPCLintRuleRepository;
 import org.sonar.plugins.cxx.pclint.CxxPCLintSensor;
-import org.sonar.plugins.cxx.compiler.CxxCompilerVcRuleRepository;
-import org.sonar.plugins.cxx.compiler.CxxCompilerGccRuleRepository;
-import org.sonar.plugins.cxx.compiler.CxxCompilerVcParser;
-import org.sonar.plugins.cxx.compiler.CxxCompilerGccParser;
-import org.sonar.plugins.cxx.compiler.CxxCompilerSensor;
 import org.sonar.plugins.cxx.rats.CxxRatsRuleRepository;
 import org.sonar.plugins.cxx.rats.CxxRatsSensor;
 import org.sonar.plugins.cxx.squid.CxxSquidSensor;
@@ -50,16 +49,14 @@ import org.sonar.plugins.cxx.xunit.CxxXunitSensor;
 
 import com.google.common.collect.ImmutableList;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public final class CxxPlugin extends SonarPlugin {
   static final String SOURCE_FILE_SUFFIXES_KEY = "sonar.cxx.suffixes.sources";
-  static final String HEADER_FILE_SUFFIXES_KEY = "sonar.cxx.suffixes.headers";
+  public static final String HEADER_FILE_SUFFIXES_KEY = "sonar.cxx.suffixes.headers";
   public static final String DEFINES_KEY = "sonar.cxx.defines";
   public static final String INCLUDE_DIRECTORIES_KEY = "sonar.cxx.includeDirectories";
   public static final String ERROR_RECOVERY_KEY = "sonar.cxx.errorRecoveryEnabled";
   public static final String FORCE_INCLUDE_FILES_KEY = "sonar.cxx.forceIncludes";
+  public static final String C_FILES_PATTERNS_KEY = "sonar.cxx.cFilesPatterns";
   public static final String INCLUDE_DIRECTORIES_PARSE_KEY = "sonar.cxx.includeDirectoriesToParse";
 
   public static List<PropertyDefinition> generalProperties() {
@@ -109,6 +106,15 @@ public final class CxxPlugin extends SonarPlugin {
       .index(5)
       .build(),
 
+      PropertyDefinition.builder(C_FILES_PATTERNS_KEY)
+      .defaultValue(CxxLanguage.DEFAULT_C_FILES)
+      .name("C source files patterns")
+      .description("Comma-separated list of wildcard patterns used to detect C files. When a file matches any of the patterns, it is parsed as a standard C file.")
+      .subCategory(subcateg)
+      .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
+      .index(6)
+      .build(),
+
       PropertyDefinition.builder(INCLUDE_DIRECTORIES_PARSE_KEY)
       .defaultValue("")
       .name("Include directories with parsing")
@@ -117,7 +123,7 @@ public final class CxxPlugin extends SonarPlugin {
       .subCategory(subcateg)
       .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
       .type(PropertyType.TEXT)
-      .index(6)
+      .index(7)
       .build(),
 
       PropertyDefinition.builder(CxxPlugin.ERROR_RECOVERY_KEY)
@@ -340,6 +346,17 @@ public final class CxxPlugin extends SonarPlugin {
       .index(3)
       .build(),
 
+      PropertyDefinition.builder(CxxCoverageSensor.FORCE_ZERO_COVERAGE_KEY)
+      .name("Assign zero line coverage to source files without coverage report(s)")
+      .description("If 'True', assign zero line coverage to source files without coverage report(s),"
+                   + "which results in a more realistic overall Technical Debt value.")
+      .defaultValue("True")
+      .subCategory(subcateg)
+      .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
+      .type(PropertyType.BOOLEAN)
+      .index(4)
+      .build(),
+      
       PropertyDefinition.builder(CxxXunitSensor.REPORT_PATH_KEY)
       .name("Unit test execution report(s)")
       .description("Path to unit test execution report(s), relative to projects root."
@@ -347,7 +364,7 @@ public final class CxxPlugin extends SonarPlugin {
                    + " Use <a href='https://ant.apache.org/manual/dirtasks.html'>Ant-style wildcards</a> if neccessary.")
       .subCategory(subcateg)
       .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
-      .index(4)
+      .index(5)
       .build(),
 
       PropertyDefinition.builder(CxxXunitSensor.XSLT_URL_KEY)
@@ -356,8 +373,19 @@ public final class CxxPlugin extends SonarPlugin {
                    + " To import a report in an other format, set this property to an URL to a XSLT stylesheet which is able to perform the according transformation.")
       .subCategory(subcateg)
       .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
-      .index(5)
-      .build()
+      .index(6)
+      .build(),
+
+      PropertyDefinition.builder(CxxXunitSensor.PROVIDE_DETAILS_KEY)
+      .name("Provide test execution details")
+      .description("If 'True', tries to assign testcases in report to test resources in Sonar, "
+                   + "thus making the drillown to details possible")
+      .defaultValue("True")
+      .subCategory(subcateg)
+      .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
+      .type(PropertyType.BOOLEAN)
+      .index(7)
+      .build()      
       );
   }
 
@@ -368,8 +396,8 @@ public final class CxxPlugin extends SonarPlugin {
     List<Object> l = new ArrayList<Object>();
     l.add(CxxMetrics.class);
     l.add(CxxLanguage.class);
-    l.add(CxxSourceImporter.class);
     l.add(CxxColorizer.class);
+    l.add(CxxMetrics.class);
     l.add(CxxSquidSensor.class);
     l.add(CxxCpdMapping.class);
     l.add(CxxRatsRuleRepository.class);

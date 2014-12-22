@@ -19,13 +19,13 @@
  */
 package org.sonar.plugins.cxx.pclint;
 
-import org.junit.Test;
-import org.sonar.api.platform.ServerFileSystem;
-import org.sonar.api.rules.XMLRuleParser;
-
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
+
+import org.junit.Test;
 import org.sonar.api.config.Settings;
+import org.sonar.api.platform.ServerFileSystem;
+import org.sonar.api.rules.XMLRuleParser;
 
 public class CxxPCLintRuleRepositoryTest {
 
@@ -34,6 +34,6 @@ public class CxxPCLintRuleRepositoryTest {
     CxxPCLintRuleRepository rulerep = new CxxPCLintRuleRepository(
         mock(ServerFileSystem.class),
         new XMLRuleParser(), new Settings());
-    assertEquals(1410, rulerep.createRules().size());
+    assertEquals(1443, rulerep.createRules().size());
   }
 }

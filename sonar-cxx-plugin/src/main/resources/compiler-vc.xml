@@ -1,5 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rules>
+  <rule key="CustomRuleTemplate">
+    <cardinality>MULTIPLE</cardinality>
+    <priority>MAJOR</priority>
+    <name><![CDATA[Template for custom Custom rules]]></name>
+    <description>
+      <![CDATA[
+<p>
+Follow these steps to make your custom Custom rules available in SonarQube:
+</p>
+
+<ol>
+  <ol>
+    <li>Create a new rule in SonarQube by "copying" this rule template and specify the <code>CheckId</code> of your custom rule, a title, a description, and a default severity.</li>
+    <li>Enable the newly created rule in your quality profile</li>
+  </ol>
+  <li>Relaunch an analysis on your projects, et voilà, your custom rules are executed!</li>
+</ol>
+      ]]>
+    </description>
+  </rule>    
   <rule>
     <key>C4001</key>
     <configkey>C4001</configkey>
@@ -3851,6 +3871,15 @@
     <name>C4805: 'operation' : unsafe mix of type 'type' and type 'type' in operation</name>
     <description>
       This warning is for when you used a bool variable or value in an unexpected way. For example, C4804 is generated if you use operators such as the negative unary operator (-) or the complement operator (~). The compiler evaluates the expression.
+    </description>
+  </rule>
+  <rule>
+    <key>C4806</key>
+    <configkey>C4806</configkey>
+    <priority>CRITICAL</priority>
+    <name>C4806: 'operation' : unsafe operation: no value of type 'type' promoted to type 'type' can equal the given constant</name>
+    <description>
+      This message warns against code such as b == 3, where b has type bool. The promotion rules cause bool to be promoted to int. This is legal, but it can never be true. The following sample generates C4806.
     </description>
   </rule>
   <rule>

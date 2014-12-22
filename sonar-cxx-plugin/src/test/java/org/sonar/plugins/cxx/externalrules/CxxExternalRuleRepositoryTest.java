@@ -19,11 +19,11 @@
  */
 package org.sonar.plugins.cxx.externalrules;
 
-import org.junit.Test;
-import org.sonar.api.rules.XMLRuleParser;
-
 import static org.fest.assertions.Assertions.assertThat;
+
+import org.junit.Test;
 import org.sonar.api.config.Settings;
+import org.sonar.api.rules.XMLRuleParser;
 
 public class CxxExternalRuleRepositoryTest {
 
@@ -43,10 +43,10 @@ public class CxxExternalRuleRepositoryTest {
           "    </rule></rules>";
 
   @Test
-  public void createEmptyRulesTest() {
+  public void verifyTemplateRuleIsFound() {
     CxxExternalRuleRepository rulerep = new CxxExternalRuleRepository(
         new XMLRuleParser(), new Settings());
-    assertThat(rulerep.createRules()).hasSize(0);
+    assertThat(rulerep.createRules()).hasSize(1);
   }
 
   @Test
@@ -55,7 +55,7 @@ public class CxxExternalRuleRepositoryTest {
     settings.appendProperty(CxxExternalRuleRepository.RULES_KEY, profile);
     CxxExternalRuleRepository rulerep = new CxxExternalRuleRepository(
       new XMLRuleParser(), settings);
-    assertThat(rulerep.createRules()).hasSize(2);
+    assertThat(rulerep.createRules()).hasSize(3);
   }
 
   @Test
@@ -64,6 +64,6 @@ public class CxxExternalRuleRepositoryTest {
     settings.appendProperty(CxxExternalRuleRepository.RULES_KEY, null);
     CxxExternalRuleRepository rulerep = new CxxExternalRuleRepository(
       new XMLRuleParser(), settings);
-    assertThat(rulerep.createRules()).hasSize(0);
+    assertThat(rulerep.createRules()).hasSize(1);
   }
 }

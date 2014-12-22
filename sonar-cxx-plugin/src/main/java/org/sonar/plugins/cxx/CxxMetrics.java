@@ -21,66 +21,112 @@ package org.sonar.plugins.cxx;
 
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
 import org.sonar.api.measures.CoreMetrics;
 import org.sonar.api.measures.Metric;
+import org.sonar.api.measures.Metrics;
 import org.sonar.api.measures.SumChildValuesFormula;
 import org.sonar.api.rules.Rule;
 import org.sonar.api.rules.XMLRuleParser;
-import org.sonar.plugins.cxx.valgrind.CxxValgrindRuleRepository;
 
-public final class CxxMetrics implements org.sonar.api.measures.Metrics {
-	public static final Metric PARAM_COUNT = new Metric.Builder("cxx-parameter-count", "Parameter count", Metric.ValueType.INT)
-			.setDescription("Number of parameter for a function or method")
-			.setDomain(CoreMetrics.DOMAIN_COMPLEXITY)
-			.setQualitative(false)
-			.create();
-	public static final Metric VALGRIND_RUNS = new Metric.Builder("cxx-valgrind-runs", "Valgrind runs", Metric.ValueType.INT)
-			.setDescription("Number of valgrind reports parsed")
-			.setDomain(CoreMetrics.DOMAIN_TESTS)
-			.setQualitative(false)
-			.setFormula(new SumChildValuesFormula(true))
-			.create();
-	public static final Metric VALGRIND_ERRORS = new Metric.Builder("cxx-valgrind-errors", "Valgrind errors", Metric.ValueType.INT)
-			.setDescription("Number of errors reported by valgrind")
-			.setDomain(CoreMetrics.DOMAIN_TESTS)
+public class CxxMetrics implements Metrics {
+public static final Metric COMPILER = new Metric.Builder("CXX-COMPILER", "C++ compiler Warnings", Metric.ValueType.INT)
+      .setDirection(Metric.DIRECTION_WORST)
+      .setQualitative(true)
+      .setDomain("C++")
+      .create();
+public static final Metric CPPCHECK = new Metric.Builder("CXX-CPPCHECK", "CppCheck Errors", Metric.ValueType.INT)
+    .setDirection(Metric.DIRECTION_WORST)
+    .setQualitative(true)
+    .setDomain("C++")
+    .create();
+public static final Metric EXTERNAL = new Metric.Builder("CXX-EXTERNAL", "External C++ rules violations", Metric.ValueType.INT)
+    .setDirection(Metric.DIRECTION_WORST)
+    .setQualitative(true)
+    .setDomain("C++")
+    .create();
+public static final Metric PCLINT = new Metric.Builder("CXX-PCLINT", "PC-Lint errors", Metric.ValueType.INT)
+    .setDirection(Metric.DIRECTION_WORST)
+    .setQualitative(true)
+    .setDomain("C++")
+    .create();
+public static final Metric RATS = new Metric.Builder("CXX-RATS", "RATS issues", Metric.ValueType.INT)
+    .setDirection(Metric.DIRECTION_WORST)
+    .setQualitative(true)
+    .setDomain("C++")
+    .create();
+public static final Metric SQUID = new Metric.Builder("CXX-SQUID", "C++ checks", Metric.ValueType.INT)
+    .setDirection(Metric.DIRECTION_WORST)
+    .setQualitative(true)
+    .setDomain("C++")
+    .create();
+public static final Metric VALGRIND = new Metric.Builder("CXX-VALGRIND", "Valgrind errors", Metric.ValueType.INT)
+    .setDirection(Metric.DIRECTION_WORST)
+    .setQualitative(true)
+    .setDomain("C++")
+    .create();
+public static final Metric VALGRIND_RUNS = new Metric.Builder("cxx-valgrind-runs", "Valgrind runs", Metric.ValueType.INT)
+    .setDescription("Number of valgrind reports parsed")
+    .setDomain("C++")
+    .setQualitative(false)
+    .setFormula(new SumChildValuesFormula(true))
+    .create();
+public static final Metric VERAXX = new Metric.Builder("CXX-VERAXX", "Vera++ rule violations", Metric.ValueType.INT)
+    .setDirection(Metric.DIRECTION_WORST)
+    .setQualitative(true)
+    .setDomain("C++")
+    .create();
+public static final Metric DEPENDENCIES = new Metric.Builder("CXX-DEPENDENCIES", "Cyclic dependency violations", Metric.ValueType.INT)
+    .setDirection(Metric.DIRECTION_WORST)
+    .setQualitative(true)
+    .setDomain("C++")
+    .create();
+public static final Metric PARAM_COUNT = new Metric.Builder("cxx-parameter-count", "Parameter count", Metric.ValueType.INT)
+	.setDescription("Number of parameter for a function or method")
+	.setDomain(CoreMetrics.DOMAIN_COMPLEXITY)
+	.setQualitative(false)
+	.create();
+private void addRuleMetrics(String key, String filename, String domain) {
+	XMLRuleParser xmlParser = new XMLRuleParser();
+	List <Rule> rules = new ArrayList<Rule>();
+	final InputStream xmlStream = getClass().getResourceAsStream(filename);
+    rules.addAll(xmlParser.parse(xmlStream));
+    for (Rule rule: rules) {
+    	String subKey = key+"-"+rule.getKey();
+    	Metric metric = new Metric.Builder("cxx-" + subKey, rule.getName(), Metric.ValueType.INT)
+    		.setDescription("Number of " + rule.getName() + "errors reported by " + key)
+    		.setDomain(domain)
 			.setQualitative(true)
 			.setBestValue(0.0).setDirection(Metric.DIRECTION_WORST)
-			.setFormula(new SumChildValuesFormula(true))
+			.setFormula(new SumChildValuesFormula(false))
 			.create();
-	private static HashMap<String, Metric> otherMetrics = new HashMap<String, Metric> ();
-	public List<Metric> getMetrics() {
-		if (otherMetrics.isEmpty()) {
-			// TODO: unduplicate string constants
-			addRuleMetrics("valgrind", "/valgrind.xml", CoreMetrics.DOMAIN_TESTS);
-		}
-		ArrayList<Metric> result = new ArrayList<Metric>();
-		result.addAll(Arrays.asList(PARAM_COUNT, VALGRIND_RUNS, VALGRIND_ERRORS ));
-		result.addAll(otherMetrics.values());
-		return result;
+    	otherMetrics.put(subKey, metric);
+    }
+}
+public static Metric findMetric(String section, String key) {
+	String subKey = section + "-" + key;
+    return otherMetrics.get(subKey);
+}	
+private static HashMap<String, Metric> otherMetrics = new HashMap<String, Metric> ();
+public List<Metric> getMetrics() {
+    List<Metric> list = new ArrayList<Metric>();
+    list.add(DEPENDENCIES);
+    list.add(COMPILER);
+    list.add(CPPCHECK);
+    list.add(EXTERNAL);
+    list.add(PCLINT);
+    list.add(RATS);
+    list.add(SQUID);
+    list.add(VALGRIND);
+    list.add(VALGRIND_RUNS);
+    list.add(VERAXX);
+    list.add(PARAM_COUNT);
+	if (otherMetrics.isEmpty()) {
+		addRuleMetrics("valgrind", "/valgrind.xml", CoreMetrics.DOMAIN_TESTS);
 	}
-	private void addRuleMetrics(String key, String filename, String domain) {
-		XMLRuleParser xmlParser = new XMLRuleParser();
-		List <Rule> rules = new ArrayList<Rule>();
-		final InputStream xmlStream = getClass().getResourceAsStream(filename);
-	    rules.addAll(xmlParser.parse(xmlStream));
-	    for (Rule rule: rules) {
-	    	String subKey = key+"-"+rule.getKey();
-	    	Metric metric = new Metric.Builder("cxx-" + subKey, rule.getName(), Metric.ValueType.INT)
-	    		.setDescription("Number of " + rule.getName() + "errors reported by " + key)
-	    		.setDomain(domain)
-				.setQualitative(true)
-				.setBestValue(0.0).setDirection(Metric.DIRECTION_WORST)
-				.setFormula(new SumChildValuesFormula(false))
-				.create();
-	    	otherMetrics.put(subKey, metric);
-	    }
-	}
-	public static Metric findMetric(String section, String key) {
-		String subKey = section + "-" + key;
-        return otherMetrics.get(subKey);
-	}	
+	list.addAll(otherMetrics.values());
+    return list;
+  }
 }

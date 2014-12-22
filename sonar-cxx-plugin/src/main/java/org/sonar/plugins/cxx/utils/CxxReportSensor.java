@@ -19,38 +19,42 @@
  */
 package org.sonar.plugins.cxx.utils;
 
-import org.apache.tools.ant.DirectoryScanner;
-import org.sonar.api.batch.Sensor;
-import org.sonar.api.batch.SensorContext;
-import org.sonar.api.config.Settings;
-import org.sonar.api.measures.Metric;
-import org.sonar.api.resources.Project;
-import org.sonar.api.rules.Rule;
-import org.sonar.api.rules.RuleFinder;
-import org.sonar.api.rules.RuleQuery;
-import org.sonar.api.rules.Violation;
-import org.sonar.api.utils.SonarException;
-import org.sonar.plugins.cxx.CxxLanguage;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+
+import org.apache.tools.ant.DirectoryScanner;
+import org.sonar.api.batch.Sensor;
+import org.sonar.api.batch.SensorContext;
+import org.sonar.api.component.ResourcePerspectives;
+import org.sonar.api.config.Settings;
+import org.sonar.api.issue.Issuable;
+import org.sonar.api.issue.Issue;
+import org.sonar.api.measures.Measure;
+import org.sonar.api.measures.Metric;
+import org.sonar.api.resources.Project;
+import org.sonar.api.resources.Resource;
+import org.sonar.api.rule.RuleKey;
+import org.sonar.api.rules.Rule;
+import org.sonar.api.rules.RuleQuery;
+import org.sonar.api.rules.Violation;
+import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import org.sonar.api.utils.SonarException;
+import org.sonar.plugins.cxx.CxxLanguage;
+
 import java.util.Map.Entry;
 
-import org.sonar.api.resources.Resource;
 
 /**
  * {@inheritDoc}
  */
 public abstract class CxxReportSensor implements Sensor {
-  private RuleFinder ruleFinder;
+  private ResourcePerspectives perspectives;
   protected Settings conf;
   private HashSet<String> notFoundFiles = new HashSet<String>();
   private HashSet<String> uniqueIssues = new HashSet<String>();
-  private HashMap<String, Rule> ruleCache = new HashMap<String, Rule>();
   protected ModuleFileSystem fs;
   private class AdditiveMeasure {
 	  public Metric metric;
@@ -62,6 +66,10 @@ public abstract class CxxReportSensor implements Sensor {
   }
   private HashMap<Resource, ArrayList<AdditiveMeasure> > measures = new HashMap<Resource, ArrayList<AdditiveMeasure> >();
 
+  private final Metric metric;
+  private int violationsCount;
+private HashMap<String, Rule> ruleCache;
+
   /**
    * {@inheritDoc}
    */
@@ -72,10 +80,21 @@ public abstract class CxxReportSensor implements Sensor {
   /**
    * {@inheritDoc}
    */
-  public CxxReportSensor(RuleFinder ruleFinder, Settings conf, ModuleFileSystem fs) {
-    this.ruleFinder = ruleFinder;
+  public CxxReportSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs) {
+    this.perspectives = perspectives;
     this.conf = conf;
     this.fs = fs;
+    this.metric = null;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  public CxxReportSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs, Metric metric) {
+    this.perspectives = perspectives;
+    this.conf = conf;
+    this.fs = fs;
+    this.metric = metric;
   }
 
   /**
@@ -92,10 +111,16 @@ public abstract class CxxReportSensor implements Sensor {
     try {
       List<File> reports = getReports(conf, fs.baseDir().getPath(),
           reportPathKey(), defaultReportPath());
+
+      violationsCount = 0;
+
       for (File report : reports) {
         CxxUtils.LOG.info("Processing report '{}'", report);
         try{
+          int prevViolationsCount = violationsCount;
           processReport(project, context, report);
+          CxxUtils.LOG.info("{} processed = {}", metric == null ? "Issues" : metric.getName(),
+                            violationsCount - prevViolationsCount);
         }
         catch(EmptyReportException e){
           CxxUtils.LOG.warn("The report '{}' seems to be empty, ignoring.", report);
@@ -110,6 +135,12 @@ public abstract class CxxReportSensor implements Sensor {
     	  for (AdditiveMeasure m : entry.getValue()) {
     		  context.saveMeasure(entry.getKey(), m.metric, m.value);
     	  }
+      }
+
+      if (metric != null) {
+        Measure measure = new Measure(metric);
+        measure.setIntValue(violationsCount);
+        context.saveMeasure(measure);
       }
       measures = new HashMap<Resource, ArrayList<AdditiveMeasure>>();
     } catch (Exception e) {
@@ -191,10 +222,7 @@ public abstract class CxxReportSensor implements Sensor {
     	lineNr = getLineAsInt(line);
     }
     if (add) {
-      Rule rule = getRule(ruleRepoKey, ruleId);
-      if (rule != null) {
-        contextSaveViolation(context, resource, lineNr, rule, msg);
-      }
+        contextSaveViolation(resource, lineNr, RuleKey.of(ruleRepoKey, ruleId), msg);
     }
 
     return add;
@@ -249,30 +277,31 @@ public abstract class CxxReportSensor implements Sensor {
 	  }
 	  return resource;
   }
-  
   private void contextSaveViolation(SensorContext context, Resource resource, int lineNr, Rule rule, String msg) {
-    Violation violation = Violation.create(rule, resource);
-    if (lineNr > 0) {
-      violation.setLineId(lineNr);
-    }
-    violation.setMessage(msg);
-    context.saveViolation(violation);
-  }
+	    Violation violation = Violation.create(rule, resource);
+	    if (lineNr > 0) {
+	      violation.setLineId(lineNr);
+	    }
+	    violation.setMessage(msg);
+	    context.saveViolation(violation);
+	  }
 
-  private Rule getRule(String ruleRepoKey, String ruleId) {
-    String key = ruleRepoKey + ruleId; // StringBuilder is slower
-    Rule rule = ruleCache.get(key);
-    if (rule == null) {
-      RuleQuery ruleQuery = RuleQuery.create()
-        .withRepositoryKey(ruleRepoKey)
-        .withKey(ruleId);
-      rule = ruleFinder.find(ruleQuery);
-      ruleCache.put(key, rule);
-      if (rule == null) {
-        CxxUtils.LOG.warn("Cannot find the rule {}, skipping violation", ruleId);
+  private boolean contextSaveViolation(Resource resource, int lineNr, RuleKey rule, String msg) {
+    Issuable issuable = perspectives.as(Issuable.class, resource);
+    boolean result = false;
+    if (issuable != null) {
+      Issuable.IssueBuilder issueBuilder = issuable.newIssueBuilder()
+          .ruleKey(rule)
+          .message(msg);
+      if (lineNr > 0) {
+        issueBuilder = issueBuilder.line(lineNr);
       }
+      Issue issue = issueBuilder.build();
+      result = issuable.addIssue(issue);
+      if (result)
+        violationsCount++;
     }
-    return rule;
+    return result;
   }
 
   private int getLineAsInt(String line) {

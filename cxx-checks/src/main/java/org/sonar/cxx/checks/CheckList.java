@@ -19,9 +19,9 @@
  */
 package org.sonar.cxx.checks;
 
-import com.google.common.collect.ImmutableList;
-
 import java.util.List;
+
+import com.google.common.collect.ImmutableList;
 
 public final class CheckList {
 
@@ -37,6 +37,8 @@ public final class CheckList {
         CollapsibleIfCandidateCheck.class,
         CommentedCodeCheck.class,
         CommentRegularExpressionCheck.class,
+        CycleBetweenPackagesCheck.class,
+        DuplicatedIncludeCheck.class,
         FileComplexityCheck.class,
         FileHeaderCheck.class,
         FixmeTagPresenceCheck.class,
@@ -47,18 +49,21 @@ public final class CheckList {
         IndentationCheck.class,
         MagicNumberCheck.class,
         MissingCurlyBracesCheck.class,
+        MissingIncludeFileCheck.class,
         MissingNewLineAtEndOfFileCheck.class,
         NoSonarCheck.class,
         ParsingErrorCheck.class,
         ParsingErrorRecoveryCheck.class,
         ReservedNamesCheck.class,
         StringLiteralDuplicatedCheck.class,
+        SwitchLastCaseIsDefaultCheck.class,
         TabCharacterCheck.class,
         TodoTagPresenceCheck.class,
         TooLongLineCheck.class,
         TooManyLinesOfCodeInFileCheck.class,
         TooManyLinesOfCodeInFunctionCheck.class,
         TooManyStatementsPerLineCheck.class,
+        UndocumentedApiCheck.class,
         UnnamedNamespaceInHeaderCheck.class,
         UselessParenthesesCheck.class,
         UseCorrectTypeCheck.class,

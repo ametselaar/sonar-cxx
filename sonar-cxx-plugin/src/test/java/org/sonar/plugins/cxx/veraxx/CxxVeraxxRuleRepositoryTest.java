@@ -19,13 +19,13 @@
  */
 package org.sonar.plugins.cxx.veraxx;
 
-import org.junit.Test;
-import org.sonar.api.platform.ServerFileSystem;
-import org.sonar.api.rules.XMLRuleParser;
-
 import static org.fest.assertions.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+
+import org.junit.Test;
 import org.sonar.api.config.Settings;
+import org.sonar.api.platform.ServerFileSystem;
+import org.sonar.api.rules.XMLRuleParser;
 
 public class CxxVeraxxRuleRepositoryTest {
 
@@ -34,6 +34,6 @@ public class CxxVeraxxRuleRepositoryTest {
     CxxVeraxxRuleRepository rulerep = new CxxVeraxxRuleRepository(
         mock(ServerFileSystem.class),
         new XMLRuleParser(), new Settings());
-    assertThat(rulerep.createRules()).hasSize(27);
+    assertThat(rulerep.createRules()).hasSize(28);
   }
 }

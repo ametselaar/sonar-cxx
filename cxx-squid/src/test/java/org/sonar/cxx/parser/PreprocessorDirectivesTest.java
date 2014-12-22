@@ -19,17 +19,15 @@
  */
 package org.sonar.cxx.parser;
 
-import com.sonar.sslr.api.AstNode;
-import com.sonar.sslr.impl.Parser;
-import com.sonar.sslr.squid.SquidAstVisitorContext;
-import org.junit.Test;
-import com.sonar.sslr.api.Grammar;
+import static org.sonar.sslr.tests.Assertions.assertThat;
+
 import java.util.LinkedList;
 import java.util.List;
-import org.apache.commons.lang.StringUtils;
 
-import static org.sonar.sslr.tests.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
+import org.apache.commons.lang.StringUtils;
+import org.junit.Test;
+
+import com.sonar.sslr.api.AstNode;
 
 public class PreprocessorDirectivesTest extends ParserBaseTest {
 
@@ -108,11 +106,11 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
       + "A;"))
       .equals("a ; EOF"));
 
-//    @todo
-//    assert (serialize(p.parse(
-//      "#define A_B A/*Comment*/B\n"
-//      +" A_B;"))
-//      .equals("A B ; EOF"));
+   //@todo
+   // assert (serialize(p.parse(
+   //   "#define A_B A/*Comment*/B\n"
+   //   +" A_B;"))
+   //   .equals("A B ; EOF"));
   }
 
   @Test
@@ -121,6 +119,40 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
       "#define lang_init() c_init()\n"
       + "lang_init();"))
       .equals("c_init ( ) ; EOF"));
+  }
+
+  @Test
+  public void complex_macro_rescanning() {
+    assert (serialize(p.parse(
+        "#define lang_init std_init\n"
+            + "#define std_init() c_init()\n"
+            + "lang_init();"))
+        .equals("c_init ( ) ; EOF"));
+
+    assert (serialize(p.parse(
+        "#define lang_init(x) x = std_init\n"
+            + "#define std_init() c_init()\n"
+            + "lang_init(c)();"))
+        .equals("c = c_init ( ) ; EOF"));
+
+
+    // This one doesnt work.
+    // The preprocessor seems to resule resolves macro in the wrong order:
+    // BOOST_MSVC => _MSC_VER => 1600 ## _WORKAROUND_GUARD => 1600 _WORKAROUND_GUARD
+    //
+    // instead of
+    //
+    // BOOST_MSVC =>  _MSC_VER
+    // _MSC_VER ## _WORKAROUND_GUARD => _MSC_VER_WORKAROUND_GUARD
+    // _MSC_VER_WORKAROUND_GUARD => 0
+
+    // assert (serialize(p.parse(
+    //   "#define _MSC_VER_WORKAROUND_GUARD 0\n"
+    //   + "#define _MSC_VER 1600\n"
+    //   + "#define BOOST_MSVC _MSC_VER\n"
+    //   + "#define TEST(symbol) symbol ## _WORKAROUND_GUARD\n"
+    //   + "TEST(BOOST_MSVC);"))
+    //   .equals("0 ; EOF"));
   }
 
   @Test
@@ -153,6 +185,11 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
       + "eprintf(\"%s:%d: \", input_file, lineno);"))
       .equals("fprintf ( stderr , \"%s:%d: \" , input_file , lineno ) ; EOF"));
 
+    assert (serialize(p.parse(
+        "#define eprintf(format, args...) fprintf (stderr, format, args)\n"
+            + "eprintf(\"%s:%d: \", input_file, lineno);"))
+        .equals("fprintf ( stderr , \"%s:%d: \" , input_file , lineno ) ; EOF"));
+
     // FIXME: can this actually be swallowed by GCC?? My experiments showed the opposite, so far...
     // GNU CPP: Vou are allowed to leave the variable argument out entirely
     // assert (serialize(p.parse(
@@ -160,12 +197,11 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
     //   + "eprintf(\"success!\");"))
     //   .equals("fprintf ( stderr , \"success!\" , ) ; EOF"));
 
-//    @todo
-//    // GNU CPP: special meaning of token paste operator - if variable argument is left out then the comma before the ‘##’ will be deleted.
-//    assert (serialize(p.parse(
-//      "#define eprintf(format, ...) fprintf (stderr, format, ##__VA_ARGS__)\n"
-//      + "eprintf(\"success!\");"))
-//      .equals("fprintf ( stderr , \"success!\" ) ; EOF"));
+    // GNU CPP: special meaning of token paste operator - if variable argument is left out then the comma before the ‘##’ will be deleted.
+    assert (serialize(p.parse(
+      "#define eprintf(format, ...) fprintf (stderr, format, ##__VA_ARGS__)\n"
+      + "eprintf(\"success!\");"))
+      .equals("fprintf ( stderr , \"success!\" ) ; EOF"));
   }
 
   @Test
@@ -186,7 +222,7 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
     	      "#define xstr(s) str(s)\n"
     	      + "#define str(s) #s\n"
     	      + "#define foo 4\n"
-    	      + "string s = xstr(foo)"))
+    	      + "string s = xstr(foo);"))
     	      .equals("string s = \"4\" ; EOF")); // tested with gcc
   }
 
@@ -209,13 +245,11 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
 
     // FIXME: this failes due to a bug in production code
     // which rips apart the number '0xcf'
-    // assert (serialize(p.parse(
-    assert (p.parse(
+    assert (serialize(p.parse(
      "#define A B(cf)\n"
       + "#define B(n) 0##x##n\n" // todo: make it work without the first ##
-      + "A")
-    //   + "i = A;"))
-    //   .equals("i = 0xcf ; EOF"));
+      + "i = A;"))
+       .equals("i = 0xcf ; EOF"));
   }
 
   @Test

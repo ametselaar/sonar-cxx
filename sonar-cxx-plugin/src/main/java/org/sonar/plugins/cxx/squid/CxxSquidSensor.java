@@ -19,50 +19,57 @@
  */
 package org.sonar.plugins.cxx.squid;
 
-import com.google.common.collect.Lists;
-import com.sonar.sslr.squid.AstScanner;
-import com.sonar.sslr.squid.SquidAstVisitor;
-import com.sonar.sslr.squid.SquidAstVisitorContext;
+import java.io.File;
+import java.util.Arrays;
+import java.util.Collection;
+
+import org.sonar.squidbridge.SquidAstVisitorContext;
+
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Locale;
 
 import org.sonar.api.batch.Sensor;
 import org.sonar.api.batch.SensorContext;
-import org.sonar.api.checks.AnnotationCheckFactory;
+import org.sonar.api.batch.rule.ActiveRules;
+import org.sonar.api.batch.rule.CheckFactory;
+import org.sonar.api.batch.rule.Checks;
+import org.sonar.api.component.ResourcePerspectives;
 import org.sonar.api.config.Settings;
+import org.sonar.api.issue.Issuable;
+import org.sonar.api.issue.Issue;
 import org.sonar.api.measures.CoreMetrics;
 import org.sonar.api.measures.Measure;
 import org.sonar.api.measures.PersistenceMode;
 import org.sonar.api.measures.RangeDistributionBuilder;
 import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Language;
-import org.sonar.api.resources.Method;
+import org.sonar.api.resources.Qualifiers;
+import org.sonar.api.resources.ResourceUtils;
 import org.sonar.api.resources.Project;
 import org.sonar.api.resources.Resource;
-import org.sonar.api.rules.Violation;
+import org.sonar.api.scan.filesystem.ModuleFileSystem;
 import org.sonar.cxx.CxxAstScanner;
 import org.sonar.cxx.CxxConfiguration;
 import org.sonar.cxx.api.CxxMetric;
 import org.sonar.cxx.checks.CheckList;
+import org.sonar.cxx.parser.CxxParser;
 import org.sonar.plugins.cxx.CxxLanguage;
 import org.sonar.plugins.cxx.CxxMetrics;
 import org.sonar.plugins.cxx.CxxPlugin;
-import org.sonar.squid.api.CheckMessage;
-import org.sonar.squid.api.SourceCode;
-import org.sonar.squid.api.SourceFile;
-import org.sonar.squid.api.SourceFunction;
-import org.sonar.squid.indexer.QueryByParent;
-import org.sonar.squid.indexer.QueryByType;
-
-import com.sonar.sslr.api.Grammar;
-
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import org.sonar.squidbridge.AstScanner;
+import org.sonar.squidbridge.SquidAstVisitor;
+import org.sonar.squidbridge.api.CheckMessage;
+import org.sonar.squidbridge.api.SourceCode;
+import org.sonar.squidbridge.api.SourceFile;
+import org.sonar.squidbridge.api.SourceFunction;
+import org.sonar.squidbridge.indexer.QueryByParent;
+import org.sonar.squidbridge.indexer.QueryByType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
+import com.google.common.collect.Lists;
+import com.sonar.sslr.api.Grammar;
 
 /**
  * {@inheritDoc}
@@ -72,22 +79,26 @@ public final class CxxSquidSensor implements Sensor {
   private static final Number[] FUNCTIONS_DISTRIB_BOTTOM_LIMITS = {1, 2, 4, 6, 8, 10, 12, 20, 30};
   private static final Number[] FILES_DISTRIB_BOTTOM_LIMITS = {0, 5, 10, 20, 30, 60, 90};
 
-  private final AnnotationCheckFactory annotationCheckFactory;
+  private final Checks<Object> checks;
+  private ActiveRules rules;
 
   private Project project;
   private SensorContext context;
   private AstScanner<Grammar> scanner;
   private Settings conf;
   private ModuleFileSystem fs;
+  private ResourcePerspectives perspectives;
 
   /**
    * {@inheritDoc}
    */
-  public CxxSquidSensor(RulesProfile profile, Settings conf, ModuleFileSystem fs) {
-	    LOG.info("CxxSquidSensor::CxxSquidSensor");
-    this.annotationCheckFactory = AnnotationCheckFactory.create(profile, CheckList.REPOSITORY_KEY, CheckList.getChecks());
+  public CxxSquidSensor(ResourcePerspectives perspectives, RulesProfile profile, Settings conf,
+                        ModuleFileSystem fs, CheckFactory checkFactory, ActiveRules rules) {
+    this.checks = checkFactory.create(CheckList.REPOSITORY_KEY).addAnnotatedChecks(CheckList.getChecks());
+    this.rules = rules;
     this.conf = conf;
     this.fs = fs;
+    this.perspectives = perspectives;
   }
 
   public boolean shouldExecuteOnProject(Project project) {
@@ -101,9 +112,7 @@ public final class CxxSquidSensor implements Sensor {
     this.project = project;
     this.context = context;
 
-    LOG.info("CxxSquidSensor::analyse");
-    Collection<SquidAstVisitor<Grammar>> squidChecks = annotationCheckFactory.getChecks();
-    List<SquidAstVisitor<Grammar>> visitors = Lists.newArrayList(squidChecks);
+    List<SquidAstVisitor<Grammar>> visitors = new ArrayList<SquidAstVisitor<Grammar>>((Collection) checks.all());
     visitors.add(new CxxFileLogger());
     this.scanner = CxxAstScanner.create(createConfiguration(project, conf),
                                         visitors.toArray(new SquidAstVisitor[visitors.size()]));
@@ -125,20 +134,31 @@ public final class CxxSquidSensor implements Sensor {
     cxxConf.setErrorRecoveryEnabled(conf.getBoolean(CxxPlugin.ERROR_RECOVERY_KEY));
     cxxConf.setForceIncludeFiles(conf.getStringArray(CxxPlugin.FORCE_INCLUDE_FILES_KEY));
     cxxConf.setIncludeDirectoriesToParse(conf.getStringArray(CxxPlugin.INCLUDE_DIRECTORIES_PARSE_KEY));
+    cxxConf.setCFilesPatterns(conf.getStringArray(CxxPlugin.C_FILES_PATTERNS_KEY));
+    cxxConf.setHeaderFileSuffixes(conf.getStringArray(CxxPlugin.HEADER_FILE_SUFFIXES_KEY));
     return cxxConf;
   }
 
   private void save(Collection<SourceCode> squidSourceFiles) {
+    int violationsCount = 0;
+    DependencyAnalyzer dependencyAnalyzer = new DependencyAnalyzer(perspectives, project, context, rules);
     for (SourceCode squidSourceFile : squidSourceFiles) {
       SourceFile squidFile = (SourceFile) squidSourceFile;
+      File ioFile = new File(squidFile.getKey());
 
-      org.sonar.api.resources.File sonarFile = org.sonar.api.resources.File.fromIOFile(new File(squidFile.getKey()), project);
+      org.sonar.api.resources.File sonarFile = org.sonar.api.resources.File.fromIOFile(ioFile, project);
 
       saveMeasures(sonarFile, squidFile);
       saveFilesComplexityDistribution(sonarFile, squidFile);
       saveFunctionsComplexityDistribution(sonarFile, squidFile);
-      saveViolations(sonarFile, squidFile);
+      violationsCount += saveViolations(sonarFile, squidFile);
+      dependencyAnalyzer.addFile(sonarFile, CxxParser.getIncludedFiles(ioFile));
     }
+
+    Measure measure = new Measure(CxxMetrics.SQUID);
+    measure.setIntValue(violationsCount);
+    context.saveMeasure(measure);
+    dependencyAnalyzer.save();
   }
 
   private void saveMeasures(org.sonar.api.resources.File sonarFile, SourceFile squidFile) {
@@ -152,11 +172,14 @@ public final class CxxSquidSensor implements Sensor {
     context.saveMeasure(sonarFile, CoreMetrics.COMPLEXITY, squidFile.getDouble(CxxMetric.COMPLEXITY));
     context.saveMeasure(sonarFile, CoreMetrics.COMMENT_BLANK_LINES, squidFile.getDouble(CxxMetric.COMMENT_BLANK_LINES));
     context.saveMeasure(sonarFile, CoreMetrics.COMMENT_LINES, squidFile.getDouble(CxxMetric.COMMENT_LINES));
+    context.saveMeasure(sonarFile, CoreMetrics.PUBLIC_API, squidFile.getDouble(CxxMetric.PUBLIC_API));
+    context.saveMeasure(sonarFile, CoreMetrics.PUBLIC_UNDOCUMENTED_API, squidFile.getDouble(CxxMetric.PUBLIC_UNDOCUMENTED_API));
     // save some measures on function level
     Collection<SourceCode> squidFunctionsInFile = scanner.getIndex().search(new QueryByParent(squidFile), new QueryByType(SourceFunction.class));
     for (SourceCode squidFunction : squidFunctionsInFile) {
       String key = sonarFile.getKey() + "#" +  squidFunction.getKey();
-      Method sonarFunction = Method.createMethod(key, sonarFile.getLanguage());
+      Method sonarFunction = Method.createMethod(key, sonarFile.getLanguage(), sonarFile);
+      // ResourceType sonarFunction =  ResourceType.builder(Qualifiers.METHOD).
       if ( context.index(sonarFunction, sonarFile) ) {
         LOG.debug("  Save measures for " + key);
         context.saveMeasure(sonarFunction, CoreMetrics.NCLOC, squidFunction.getDouble(CxxMetric.LINES_OF_CODE));
@@ -185,16 +208,25 @@ public final class CxxSquidSensor implements Sensor {
     context.saveMeasure(sonarFile, complexityDistribution.build().setPersistenceMode(PersistenceMode.MEMORY));
   }
 
-  private void saveViolations(org.sonar.api.resources.File sonarFile, SourceFile squidFile) {
+  private int saveViolations(org.sonar.api.resources.File sonarFile, SourceFile squidFile) {
     Collection<CheckMessage> messages = squidFile.getCheckMessages();
+    int violationsCount = 0;
     if (messages != null) {
-      for (CheckMessage message : messages) {
-        Violation violation = Violation.create(annotationCheckFactory.getActiveRule(message.getCheck()), sonarFile)
-            .setLineId(message.getLine())
-            .setMessage(message.getText(Locale.ENGLISH));
-        context.saveViolation(violation);
+      Issuable issuable = perspectives.as(Issuable.class, sonarFile);
+      if (issuable != null) {
+        for (CheckMessage message : messages) {
+          Issue issue = issuable.newIssueBuilder()
+            .ruleKey(checks.ruleKey(message.getCheck()))
+            .line(message.getLine())
+            .message(message.getText(Locale.ENGLISH))
+            .build();
+          if (issuable.addIssue(issue))
+            violationsCount++;
+        }
       }
+      return violationsCount;
     }
+    return 0;
   }
 
   @Override

@@ -19,14 +19,9 @@
  */
 package org.sonar.cxx.parser;
 
-import com.sonar.sslr.impl.Parser;
-import com.sonar.sslr.impl.events.ExtendedStackTrace;
-import com.sonar.sslr.squid.SquidAstVisitorContext;
-import org.junit.Test;
-import com.sonar.sslr.api.Grammar;
-
 import static org.sonar.sslr.tests.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
+
+import org.junit.Test;
 
 public class StatementTest extends ParserBaseTest {
 
@@ -133,6 +128,8 @@ public class StatementTest extends ParserBaseTest {
     assertThat(p).matches("switch ( condition ) { default : ; }");
     assertThat(p).matches("switch ( condition ) { default : break; }");
     assertThat(p).matches("switch ( condition ) { case constantExpression : statement break; default : break; }");
+    // EXTENSION: gcc's case range
+    assertThat(p).matches("switch ( condition ) { case constantExpression ... constantExpression : break; }");
   }
 
   @Test

@@ -19,45 +19,50 @@
  */
 package org.sonar.cxx.preprocessor;
 
+import static com.sonar.sslr.api.GenericTokenType.EOF;
+import static com.sonar.sslr.api.GenericTokenType.IDENTIFIER;
+import static org.apache.commons.io.FilenameUtils.wildcardMatchOnSystem;
+import static org.sonar.cxx.api.CppKeyword.IFDEF;
+import static org.sonar.cxx.api.CppKeyword.IFNDEF;
+import static org.sonar.cxx.api.CppPunctuator.LT;
+import static org.sonar.cxx.api.CxxTokenType.NUMBER;
+import com.sonar.sslr.impl.Lexer;
+import static org.sonar.cxx.api.CxxTokenType.PREPROCESSOR;
+import static org.sonar.cxx.api.CxxTokenType.STRING;
+import static org.sonar.cxx.api.CxxTokenType.WS;
+
+
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
+
+import org.apache.commons.collections.ListUtils;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.sonar.cxx.CxxConfiguration;
+import org.sonar.cxx.lexer.CxxLexer;
+import org.sonar.squidbridge.SquidAstVisitorContext;
+
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.sonar.sslr.api.AstNode;
+import com.sonar.sslr.api.Grammar;
 import com.sonar.sslr.api.Preprocessor;
 import com.sonar.sslr.api.PreprocessorAction;
 import com.sonar.sslr.api.Token;
 import com.sonar.sslr.api.TokenType;
 import com.sonar.sslr.api.Trivia;
-import com.sonar.sslr.impl.Lexer;
 import com.sonar.sslr.impl.Parser;
-import com.sonar.sslr.squid.SquidAstVisitorContext;
-
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.sonar.cxx.CxxConfiguration;
-
-import com.sonar.sslr.api.Grammar;
-
-import org.sonar.cxx.lexer.CxxLexer;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-import java.util.Stack;
-import java.util.Map;
-
-import static com.sonar.sslr.api.GenericTokenType.EOF;
-import static com.sonar.sslr.api.GenericTokenType.IDENTIFIER;
-import static org.sonar.cxx.api.CppKeyword.IFDEF;
-import static org.sonar.cxx.api.CppKeyword.IFNDEF;
-import static org.sonar.cxx.api.CppPunctuator.LT;
-import static org.sonar.cxx.api.CxxTokenType.NUMBER;
-import static org.sonar.cxx.api.CxxTokenType.PREPROCESSOR;
-import static org.sonar.cxx.api.CxxTokenType.STRING;
-import static org.sonar.cxx.api.CxxTokenType.WS;
 
 public class CxxPreprocessor extends Preprocessor {
   private class State {
@@ -99,7 +104,7 @@ public class CxxPreprocessor extends Preprocessor {
 
     public String toString() {
       return name
-        + (params == null ? "" : "(" + serialize(params, ", ") + ")")
+        + (params == null ? "" : "(" + serialize(params, ", ") + (isVariadic ? "..." : "") + ")")
         + " -> '" + serialize(body) + "'";
     }
 
@@ -123,6 +128,47 @@ public class CxxPreprocessor extends Preprocessor {
   private SourceCodeProvider codeProvider = new SourceCodeProvider();
   private SquidAstVisitorContext<Grammar> context;
   private ExpressionEvaluator ifExprEvaluator;
+  private List<String> cFilesPatterns;
+
+  public static class Include {
+    private int line;
+    private String path;
+
+    Include(int line, String path) {
+      this.line = line;
+      this.path = path;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      Include that = (Include) o;
+
+      if (line != that.line) return false;
+      if (path != null ? !path.equals(that.path) : that.path != null) return false;
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      int result = line;
+      result = 31 * result + (path != null ? path.hashCode() : 0);
+      return result;
+    }
+
+    public String getPath() {
+      return path;
+    }
+
+    public int getLine() {
+      return line;
+    }
+  }
+  private Multimap<String, Include> includedFiles = HashMultimap.create();
+  private Multimap<String, Include> missingIncludeFiles = HashMultimap.create();
 
   // state which is not shared between files
   private State state = new State(null);
@@ -136,11 +182,31 @@ public class CxxPreprocessor extends Preprocessor {
     this(context, conf, new SourceCodeProvider());
   }
 
+  private void registerMacros(Map<String,String> standardMacros) {
+    for (Map.Entry<String, String> entry : standardMacros.entrySet()) {
+      Token bodyToken;
+      try {
+        bodyToken = Token.builder()
+            .setLine(1)
+            .setColumn(0)
+            .setURI(new java.net.URI(""))
+            .setValueAndOriginalValue(entry.getValue())
+            .setType(STRING)
+            .build();
+      } catch (java.net.URISyntaxException e) {
+        throw new RuntimeException(e);
+      }
+
+      macros.put(entry.getKey(), new Macro(entry.getKey(), null, Lists.newArrayList(bodyToken), false));
+    }
+  }
+
   public CxxPreprocessor(SquidAstVisitorContext<Grammar> context,
     CxxConfiguration conf,
     SourceCodeProvider sourceCodeProvider) {
     this.context = context;
     this.ifExprEvaluator = new ExpressionEvaluator(conf, this);
+    this.cFilesPatterns = conf.getCFilesPatterns();
 
     codeProvider = sourceCodeProvider;
     codeProvider.setIncludeRoots(conf.getIncludeDirectories(), conf.getBaseDir());
@@ -184,28 +250,13 @@ public class CxxPreprocessor extends Preprocessor {
       }
 
       // set standard macros
-      for (Map.Entry<String, String> entry : StandardDefinitions.macros().entrySet()) {
-        Token bodyToken;
-        try {
-          bodyToken = Token.builder()
-            .setLine(1)
-            .setColumn(0)
-            .setURI(new java.net.URI(""))
-            .setValueAndOriginalValue(entry.getValue())
-            .setType(STRING)
-            .build();
-        } catch (java.net.URISyntaxException e) {
-          throw new RuntimeException(e);
-        }
-
-        macros.put(entry.getKey(), new Macro(entry.getKey(), null, Lists.newArrayList(bodyToken), false));
-      }
+      registerMacros(StandardDefinitions.macros());
 
       // parse the configured force includes and store into the macro library
       for (String include : conf.getForceIncludeFiles()) {
         LOG.debug("parsing force include: '{}'", include);
         if (!include.equals("")) {
-          parseIncludeLine("#include \"" + include + "\"");
+          parseIncludeLine("#include \"" + include + "\"", "sonar.cxx.forceIncludes");
         }
       }
     } finally {
@@ -213,12 +264,44 @@ public class CxxPreprocessor extends Preprocessor {
     }
   }
 
+  public Collection<Include> getIncludedFiles(File file) {
+    return includedFiles.get(file.getPath());
+  }
+
+  public Collection<Include> getMissingIncludeFiles(File file) {
+    return missingIncludeFiles.get(file.getPath());
+  }
+
+  private boolean isCFile(String filePath) {
+    for (String pattern : cFilesPatterns) {
+      if (wildcardMatchOnSystem(filePath, pattern)) {
+        LOG.trace("Parse '{}' as C file, matches '{}' pattern", filePath, pattern);
+        return true;
+      }
+    }
+    LOG.trace("Parse '{}' as C++ file", filePath);
+    return false;
+  }
+
+  private File currentContextFile = null;
+
   @Override
   public PreprocessorAction process(List<Token> tokens) {
     Token token = tokens.get(0);
     TokenType ttype = token.getType();
     File file = getFileUnderAnalysis();
     String filePath = file == null ? token.getURI().toString() : file.getAbsolutePath();
+
+    if (context.getFile() != currentContextFile) {
+      currentContextFile = context.getFile();
+      if (isCFile(currentContextFile.getAbsolutePath())) {
+        //Create macros to replace C++ keywords when parsing C files
+        registerMacros(StandardDefinitions.compatibilityMacros());
+        macros.disable("__cplusplus");
+      } else {
+        macros.enable("__cplusplus");
+      }
+    }
 
     if (ttype == PREPROCESSOR) {
 
@@ -286,6 +369,7 @@ public class CxxPreprocessor extends Preprocessor {
     analysedFiles.clear();
     macros.clearLowPrio();
     state.reset();
+    currentContextFile = null;
   }
 
   public String valueOf(String macroname) {
@@ -415,9 +499,9 @@ public class CxxPreprocessor extends Preprocessor {
     return new PreprocessorAction(1, Lists.newArrayList(Trivia.createSkippedText(token)), new ArrayList<Token>());
   }
 
-  private void parseIncludeLine(String includeLine) {
+  private void parseIncludeLine(String includeLine, String filename) {
     AstNode includeAst = pplineParser.parse(includeLine);
-    handleIncludeLine(includeAst, includeAst.getToken(), "");
+    handleIncludeLine(includeAst, includeAst.getFirstDescendant(CppGrammar.includeBodyQuoted).getToken(), filename);
   }
 
   PreprocessorAction handleIncludeLine(AstNode ast, Token token, String filename) {
@@ -432,8 +516,17 @@ public class CxxPreprocessor extends Preprocessor {
     //    if it finds relevant preprocessor directives (currently: include's and define's)
     List<Token> result = new ArrayList<Token>();
     File includedFile = findIncludedFile(ast, token, filename);
+
+    File currentFile = this.getFileUnderAnalysis();
+    if (currentFile != null && includedFile != null) {
+      includedFiles.put(currentFile.getPath(), new Include(token.getLine(), includedFile.getAbsolutePath()));
+    }
+
     if (includedFile == null) {
       LOG.warn("[{}:{}]: cannot find the sources for '{}'", new Object[] {filename, token.getLine(), token.getValue()});
+      if (currentFile != null) {
+        missingIncludeFiles.put(currentFile.getPath(), new Include(token.getLine(), token.getValue()));
+      }
     }
     else if (!analysedFiles.contains(includedFile)) {
       analysedFiles.add(includedFile.getAbsoluteFile());
@@ -486,7 +579,6 @@ public class CxxPreprocessor extends Preprocessor {
     if (macro != null) {
       List<Token> replTokens = new LinkedList<Token>();
       int tokensConsumed = 0;
-      List<Token> arguments = new ArrayList<Token>();
 
       if (macro.params == null) {
         tokensConsumed = 1;
@@ -502,11 +594,41 @@ public class CxxPreprocessor extends Preprocessor {
       }
 
       if (tokensConsumed > 0) {
+
+        // Rescanning to expand function like macros, in case it requires consuming more tokens
+        List<Token> outTokens = new LinkedList<Token>();
+        macros.disable(macro.name);
+        while(!replTokens.isEmpty()) {
+          Token c = replTokens.get(0);
+          PreprocessorAction action = PreprocessorAction.NO_OPERATION;
+          if (c.getType() == IDENTIFIER) {
+            List<Token> rest = ListUtils.union(replTokens, tokens.subList(tokensConsumed, tokens.size()));
+            action = handleIdentifiersAndKeywords(rest, c, filename);
+          }
+          if (action == PreprocessorAction.NO_OPERATION) {
+            replTokens = replTokens.subList(1, replTokens.size());
+            outTokens.add(c);
+          }
+          else {
+            outTokens.addAll(action.getTokensToInject());
+            int tokensConsumedRescanning = action.getNumberOfConsumedTokens();
+            if (tokensConsumedRescanning >= replTokens.size()) {
+              tokensConsumed += tokensConsumedRescanning - replTokens.size();
+              replTokens = replTokens.subList(replTokens.size(), replTokens.size());
+            }
+            else {
+              replTokens = replTokens.subList(tokensConsumedRescanning, replTokens.size());
+            }
+          }
+        }
+        replTokens = outTokens;
+        macros.enable(macro.name);
+
         replTokens = reallocate(replTokens, curr);
         LOG.trace("[{}:{}]: replacing '" + curr.getValue()
-          + (arguments.isEmpty()
-              ? ""
-              : "(" + serialize(arguments, ", ") + ")") + "' -> '" + serialize(replTokens) + "'",
+                + (tokensConsumed == 1
+                ? ""
+                : serialize(tokens.subList(1, tokensConsumed))) + "' -> '" + serialize(replTokens) + "'",
             filename, curr.getLine());
 
         ppaction = new PreprocessorAction(
@@ -695,6 +817,22 @@ public class CxxPreprocessor extends Preprocessor {
         int index = defParamValues.indexOf(curr.getValue());
         if (index == -1) {
           newTokens.add(curr);
+        }
+        else if (index == arguments.size()) {
+          // EXTENSION: GCC's special meaning of token paste operator
+          // If variable argument is left out then the comma before the paste operator will be deleted
+          int j = i;
+          while(j > 0 && body.get(j - 1).getType() == WS)
+            j--;
+          if (j == 0 || !body.get(--j).getValue().equals("##"))
+            continue;
+          int k = j;
+          while(j > 0 && body.get(j - 1).getType() == WS)
+            j--;
+          if (j > 0 && body.get(j - 1).getValue().equals(",")) {
+            newTokens.remove(newTokens.size() - 1 + j - i); //remove the comma
+            newTokens.remove(newTokens.size() - 1 + k - i); //remove the paste operator
+          }
         }
         else if (index < arguments.size()) {
           boolean isHashOperand = (i > 0 && body.get(i-1).getValue().equals("#"));

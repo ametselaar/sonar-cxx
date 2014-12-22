@@ -19,20 +19,20 @@
  */
 package org.sonar.cxx.parser;
 
-import org.sonar.sslr.grammar.GrammarRuleKey;
-import com.sonar.sslr.api.Grammar;
-import org.sonar.sslr.grammar.LexerfulGrammarBuilder;
-
-import org.sonar.cxx.api.CxxKeyword;
-import org.sonar.cxx.CxxConfiguration;
-
 import static com.sonar.sslr.api.GenericTokenType.EOF;
 import static com.sonar.sslr.api.GenericTokenType.IDENTIFIER;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import static org.sonar.cxx.api.CxxTokenType.CHARACTER;
 import static org.sonar.cxx.api.CxxTokenType.NUMBER;
 import static org.sonar.cxx.api.CxxTokenType.STRING;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.sonar.cxx.CxxConfiguration;
+import org.sonar.cxx.api.CxxKeyword;
+import org.sonar.sslr.grammar.GrammarRuleKey;
+import org.sonar.sslr.grammar.LexerfulGrammarBuilder;
+
+import com.sonar.sslr.api.Grammar;
 
 /**
  * Based on the C++ Standard, Appendix A
@@ -296,7 +296,7 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
 
     b.setRootRule(translationUnit);
 
-    return b.build();
+    return b.buildWithMemoizationOfMatchesForAllRules();
   }
 
 
@@ -486,12 +486,6 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
     b.rule(binaryOperator).is(
       b.firstOf("||", "&&", "&", "|", "^", "==", "!=", "<=", "<", ">=", ">", "<<", ">>", "*", "/", "+", "-", assignmentOperator));
 
-    b.rule(binaryOperator).is(
-      b.firstOf("||", "&&", "&", "|", "^", "==", "!=", "<=", "<", ">=", ">", "<<", ">>", "*", "/", "+", "-", assignmentOperator));
-    
-    b.rule(binaryOperator).is(
-      b.firstOf("||", "&&", "&", "|", "^", "==", "!=", "<=", "<", ">=", ">", "<<", ">>", "*", "/", "+", "-", assignmentOperator));
-    
     b.rule(newExpression).is(
       b.firstOf(
         b.sequence(b.optional("::"), CxxKeyword.NEW, b.optional(newPlacement), newTypeId, b.optional(newInitializer)),
@@ -526,6 +520,8 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
 
     b.rule(castExpression).is(
       b.firstOf(
+        // C-COMPATIBILITY: C99 compound literals
+        b.sequence("(", typeId, ")", bracedInitList ),
         b.sequence(
           b.next("(", typeId, ")"), "(", typeId, ")", castExpression),
         unaryExpression
@@ -621,6 +617,8 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
 
     b.rule(switchLabelStatement).is(b.firstOf(
         b.sequence(CxxKeyword.CASE, constantExpression, ":"),
+        // EXTENSION: gcc's case range
+        b.sequence(CxxKeyword.CASE, constantExpression, "...", constantExpression, ":"),
         b.sequence(CxxKeyword.DEFAULT, ":")));
 
     b.rule(condition).is(
@@ -1104,14 +1102,16 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
       );
 
     b.rule(initializerClause).is(
-      b.optional(b.firstOf(
-        b.sequence(IDENTIFIER, ":"), 
-        b.sequence(".", IDENTIFIER, "=")
-        )
-      ),
-      b.firstOf(
-        assignmentExpression,
-        bracedInitList
+      b.sequence(
+        // C-COMPATIBILITY: C99 designated initializers
+        b.optional(b.firstOf(b.sequence(".", IDENTIFIER, "="),
+                             // EXTENSION: gcc's designated initializers range
+                             b.sequence("[", constantExpression, "...", constantExpression, "]", "="),
+                             b.sequence("[", constantExpression, "]", "="))),
+        b.firstOf(
+          assignmentExpression,
+          bracedInitList
+          )
         )
       );
 

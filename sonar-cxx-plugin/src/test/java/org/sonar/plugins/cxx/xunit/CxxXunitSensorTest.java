@@ -19,62 +19,44 @@
  */
 package org.sonar.plugins.cxx.xunit;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.sonar.api.batch.SensorContext;
-import org.sonar.api.config.Settings;
-import org.sonar.api.measures.CoreMetrics;
-import org.sonar.api.measures.Measure;
-import org.sonar.api.resources.Project;
-import org.sonar.plugins.cxx.TestUtils;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import static org.hamcrest.core.AnyOf.anyOf;
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyDouble;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.junit.Assert.assertEquals;
-import static org.hamcrest.core.Is.is;
-import static org.hamcrest.core.AnyOf.anyOf;
-import static org.junit.Assert.assertThat;
-
+import org.junit.Before;
+import org.junit.Test;
+import org.sonar.api.batch.SensorContext;
+import org.sonar.api.config.Settings;
+import org.sonar.api.measures.CoreMetrics;
+import org.sonar.api.resources.Project;
+import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import org.sonar.plugins.cxx.TestUtils;
 
 public class CxxXunitSensorTest {
   private CxxXunitSensor sensor;
   private SensorContext context;
   private Project project;
   private ModuleFileSystem fs;
+  private Settings config;
 
   @Before
   public void setUp() {
     project = TestUtils.mockProject();
     fs = TestUtils.mockFileSystem();
-    sensor = new CxxXunitSensor(new Settings(), fs, TestUtils.mockCxxLanguage());
+    config = new Settings();
     context = mock(SensorContext.class);
-  }
 
-  @Test
-  public void shouldReportCorrectViolations() {
-    sensor.analyse(project, context);
-
-    verify(context, times(4)).saveMeasure((org.sonar.api.resources.File) anyObject(),
-        eq(CoreMetrics.TESTS), anyDouble());
-    verify(context, times(4)).saveMeasure((org.sonar.api.resources.File) anyObject(),
-        eq(CoreMetrics.SKIPPED_TESTS), anyDouble());
-    verify(context, times(4)).saveMeasure((org.sonar.api.resources.File) anyObject(),
-        eq(CoreMetrics.TEST_ERRORS), anyDouble());
-    verify(context, times(4)).saveMeasure((org.sonar.api.resources.File) anyObject(),
-        eq(CoreMetrics.TEST_FAILURES), anyDouble());
-    verify(context, times(3)).saveMeasure((org.sonar.api.resources.File) anyObject(),
-        eq(CoreMetrics.TEST_SUCCESS_DENSITY), anyDouble());
-    verify(context, times(4)).saveMeasure((org.sonar.api.resources.File) anyObject(), any(Measure.class));
+    sensor = new CxxXunitSensor(config, fs);
   }
 
   @Test
@@ -93,8 +75,8 @@ public class CxxXunitSensorTest {
     Project project = TestUtils.mockProject(baseDir, sourceDirs, testDirs);
     fs = TestUtils.mockFileSystem(baseDir, sourceDirs, testDirs);
 
-    sensor = new CxxXunitSensor(config, fs, TestUtils.mockCxxLanguage());
-    sensor.buildLookupTables(project);
+    sensor = new CxxXunitSensor(config, fs);
+    sensor.buildLookupTables();
 
     // case 1:
     // the testcase file resides: directly under the test directory
@@ -146,7 +128,7 @@ public class CxxXunitSensorTest {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.REPORT_PATH_KEY, "notexistingpath");
 
-    sensor = new CxxXunitSensor(config, TestUtils.mockFileSystem(), TestUtils.mockCxxLanguage());
+    sensor = new CxxXunitSensor(config, TestUtils.mockFileSystem());
 
     sensor.analyse(project, context);
 
@@ -157,7 +139,7 @@ public class CxxXunitSensorTest {
   public void shouldThrowWhenGivenInvalidTime() {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.REPORT_PATH_KEY, "xunit-reports/invalid-time-xunit-report.xml");
-    sensor = new CxxXunitSensor(config, fs, TestUtils.mockCxxLanguage());
+    sensor = new CxxXunitSensor(config, fs);
 
     sensor.analyse(project, context);
   }
@@ -169,7 +151,7 @@ public class CxxXunitSensorTest {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.XSLT_URL_KEY, "whatever");
 
-    sensor = new CxxXunitSensor(config, fs, TestUtils.mockCxxLanguage());
+    sensor = new CxxXunitSensor(config, fs);
 
     sensor.transformReport(cppunitReport());
   }
@@ -181,7 +163,7 @@ public class CxxXunitSensorTest {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.XSLT_URL_KEY, "cppunit-1.x-to-junit-1.0.xsl");
 
-    sensor = new CxxXunitSensor(config, fs, TestUtils.mockCxxLanguage());
+    sensor = new CxxXunitSensor(config, fs);
     File reportBefore = cppunitReport();
 
     File reportAfter = sensor.transformReport(reportBefore);

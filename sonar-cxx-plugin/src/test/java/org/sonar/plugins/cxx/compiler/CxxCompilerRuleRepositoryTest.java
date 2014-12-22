@@ -20,8 +20,9 @@
 package org.sonar.plugins.cxx.compiler;
 
 import static org.fest.assertions.Assertions.assertThat;
-import org.junit.Test;
 import static org.mockito.Mockito.mock;
+
+import org.junit.Test;
 import org.sonar.api.config.Settings;
 import org.sonar.api.platform.ServerFileSystem;
 import org.sonar.api.rules.XMLRuleParser;
@@ -33,7 +34,7 @@ public class CxxCompilerRuleRepositoryTest {
     CxxCompilerVcRuleRepository rulerep = new CxxCompilerVcRuleRepository(
         mock(ServerFileSystem.class),
         new XMLRuleParser(), new Settings());
-    assertThat(rulerep.createRules()).hasSize(691);
+    assertThat(rulerep.createRules()).hasSize(693);
   }
 
   @Test
@@ -41,6 +42,6 @@ public class CxxCompilerRuleRepositoryTest {
     CxxCompilerGccRuleRepository rulerep = new CxxCompilerGccRuleRepository(
         mock(ServerFileSystem.class),
         new XMLRuleParser(), new Settings());
-    assertThat(rulerep.createRules()).hasSize(159);
+    assertThat(rulerep.createRules()).hasSize(160);
   }
 }

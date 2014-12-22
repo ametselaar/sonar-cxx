@@ -19,19 +19,20 @@
  */
 package org.sonar.plugins.cxx.rats;
 
+import java.io.File;
+import java.util.List;
+
 import org.jdom.Element;
 import org.jdom.input.SAXBuilder;
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.component.ResourcePerspectives;
 import org.sonar.api.config.Settings;
 import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Project;
-import org.sonar.api.rules.RuleFinder;
+import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import org.sonar.plugins.cxx.CxxMetrics;
 import org.sonar.plugins.cxx.utils.CxxReportSensor;
 import org.sonar.plugins.cxx.utils.CxxUtils;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
-
-import java.io.File;
-import java.util.List;
 
 /**
  * {@inheritDoc}
@@ -45,8 +46,8 @@ public final class CxxRatsSensor extends CxxReportSensor {
   /**
    * {@inheritDoc}
    */
-  public CxxRatsSensor(RuleFinder ruleFinder, Settings conf, ModuleFileSystem fs, RulesProfile profile) {
-    super(ruleFinder, conf, fs);
+  public CxxRatsSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs, RulesProfile profile) {
+    super(perspectives, conf, fs, CxxMetrics.RATS);
     this.profile = profile;
   }
 
@@ -77,7 +78,6 @@ public final class CxxRatsSensor extends CxxReportSensor {
     {
       SAXBuilder builder = new SAXBuilder(false);
       Element root = builder.build(report).getRootElement();
-      int countIssues = 0;
       @SuppressWarnings("unchecked")
       List<Element> vulnerabilities = root.getChildren("vulnerability");
       for (Element vulnerability : vulnerabilities) {
@@ -94,14 +94,11 @@ public final class CxxRatsSensor extends CxxReportSensor {
           List<Element> lines = file.getChildren("line");
           for (Element lineElem : lines) {
             String line = lineElem.getTextTrim();
-            if (saveUniqueViolation(project, context, CxxRatsRuleRepository.KEY,
-                fileName, line, type, message)) {
-              countIssues++;
-              }
+            saveUniqueViolation(project, context, CxxRatsRuleRepository.KEY,
+                fileName, line, type, message);
           }
         }
       }
-      CxxUtils.LOG.info("RATS issues processed = " + countIssues);
     } catch (org.jdom.input.JDOMParseException e) {
       // when RATS fails the XML file might be incomplete
       CxxUtils.LOG.error("Ignore incomplete XML output from RATS '{}'", e.toString());

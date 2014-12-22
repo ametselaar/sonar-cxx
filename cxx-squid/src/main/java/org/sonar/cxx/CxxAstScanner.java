@@ -19,42 +19,43 @@
  */
 package org.sonar.cxx;
 
-import com.sonar.sslr.api.AstNode;
-import com.sonar.sslr.api.AstNodeType;
-import com.sonar.sslr.api.CommentAnalyser;
-import com.sonar.sslr.api.Token;
-import com.sonar.sslr.impl.Parser;
-import com.sonar.sslr.api.Grammar;
-import com.sonar.sslr.squid.AstScanner;
-import com.sonar.sslr.squid.SourceCodeBuilderCallback;
-import com.sonar.sslr.squid.SourceCodeBuilderVisitor;
-import com.sonar.sslr.squid.SquidAstVisitor;
-import com.sonar.sslr.squid.SquidAstVisitorContextImpl;
-import com.sonar.sslr.squid.metrics.CommentsVisitor;
-import com.sonar.sslr.squid.metrics.ComplexityVisitor;
-import com.sonar.sslr.squid.metrics.CounterVisitor;
-import com.sonar.sslr.squid.metrics.LinesVisitor;
+import java.io.File;
+import java.util.Collection;
 
 import org.sonar.cxx.api.CxxKeyword;
 import org.sonar.cxx.api.CxxMetric;
 import org.sonar.cxx.api.CxxPunctuator;
-import org.sonar.cxx.parser.CxxParser;
 import org.sonar.cxx.parser.CxxGrammarImpl;
+import org.sonar.cxx.parser.CxxParser;
 import org.sonar.cxx.visitors.CxxCharsetAwareVisitor;
 import org.sonar.cxx.visitors.CxxFileVisitor;
 import org.sonar.cxx.visitors.CxxLinesOfCodeVisitor;
 import org.sonar.cxx.visitors.CxxParseErrorLoggerVisitor;
-import org.sonar.squid.api.SourceClass;
-import org.sonar.squid.api.SourceCode;
-import org.sonar.squid.api.SourceFile;
-import org.sonar.squid.api.SourceFunction;
-import org.sonar.squid.api.SourceProject;
-import org.sonar.squid.indexer.QueryByType;
+import org.sonar.cxx.visitors.CxxPublicApiVisitor;
+import org.sonar.squidbridge.AstScanner;
+import org.sonar.squidbridge.CommentAnalyser;
+import org.sonar.squidbridge.SourceCodeBuilderCallback;
+import org.sonar.squidbridge.SourceCodeBuilderVisitor;
+import org.sonar.squidbridge.SquidAstVisitor;
+import org.sonar.squidbridge.SquidAstVisitorContextImpl;
+import org.sonar.squidbridge.api.SourceClass;
+import org.sonar.squidbridge.api.SourceCode;
+import org.sonar.squidbridge.api.SourceFile;
+import org.sonar.squidbridge.api.SourceFunction;
+import org.sonar.squidbridge.api.SourceProject;
+import org.sonar.squidbridge.indexer.QueryByType;
+import org.sonar.squidbridge.metrics.CommentsVisitor;
+import org.sonar.squidbridge.metrics.ComplexityVisitor;
+import org.sonar.squidbridge.metrics.CounterVisitor;
+import org.sonar.squidbridge.metrics.LinesVisitor;
 
-import java.io.File;
+import com.sonar.sslr.api.AstNode;
 import java.util.ArrayList;
-import java.util.Collection;
+import com.sonar.sslr.api.AstNodeType;
+import com.sonar.sslr.api.Grammar;
 import java.util.List;
+import com.sonar.sslr.api.Token;
+import com.sonar.sslr.impl.Parser;
 
 public final class CxxAstScanner {
 
@@ -155,6 +156,9 @@ public final class CxxAstScanner {
     /* Metrics */
     builder.withSquidAstVisitor(new LinesVisitor<Grammar>(CxxMetric.LINES));
     builder.withSquidAstVisitor(new CxxLinesOfCodeVisitor<Grammar>(CxxMetric.LINES_OF_CODE));
+    builder.withSquidAstVisitor(new CxxPublicApiVisitor<Grammar>(CxxMetric.PUBLIC_API,
+                                                                 CxxMetric.PUBLIC_UNDOCUMENTED_API)
+        .withHeaderFileSuffixes(conf.getHeaderFileSuffixes()));
 
     builder.withSquidAstVisitor(CommentsVisitor.<Grammar> builder().withCommentMetric(CxxMetric.COMMENT_LINES)
         .withNoSonar(true)

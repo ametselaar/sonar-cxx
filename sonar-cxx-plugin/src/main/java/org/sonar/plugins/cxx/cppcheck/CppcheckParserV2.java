@@ -20,7 +20,9 @@
 package org.sonar.plugins.cxx.cppcheck;
 
 import java.io.File;
+
 import javax.xml.stream.XMLStreamException;
+
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.staxmate.in.SMHierarchicCursor;
 import org.codehaus.staxmate.in.SMInputCursor;
@@ -36,7 +38,6 @@ import org.sonar.plugins.cxx.utils.EmptyReportException;
 public class CppcheckParserV2 implements CppcheckParser {
 
   private CxxCppCheckSensor sensor;
-  private boolean parsed = false;
 
   public CppcheckParserV2(CxxCppCheckSensor sensor) {
     this.sensor = sensor;
@@ -54,7 +55,7 @@ public class CppcheckParserV2 implements CppcheckParser {
        * {@inheritDoc}
        */
       public void stream(SMHierarchicCursor rootCursor) throws XMLStreamException {
-        parsed = true;
+        boolean parsed = false;
 
         try {
           rootCursor.advance();
@@ -67,7 +68,7 @@ public class CppcheckParserV2 implements CppcheckParser {
           if (version.equals("2")) {
             SMInputCursor errorsCursor = rootCursor.childElementCursor("errors");
             if (errorsCursor.getNext() != null) {
-              int countIssues = 0;
+              parsed = true;
               SMInputCursor errorCursor = errorsCursor.childElementCursor("error");
               while (errorCursor.getNext() != null) {
                 String id = errorCursor.getAttrValue("id");
@@ -82,19 +83,18 @@ public class CppcheckParserV2 implements CppcheckParser {
                 }
 
                 if (isInputValid(file, line, id, msg)) {
-                  if(sensor.saveUniqueViolation(project, context, CxxCppCheckRuleRepository.KEY, file, line, id, msg)){
-                    countIssues++;
-                  }
+                  sensor.saveUniqueViolation(project, context, CxxCppCheckRuleRepository.KEY, file, line, id, msg);
                 } else {
                   CxxUtils.LOG.warn("Skipping invalid violation: '{}'", msg);
                 }
               }
-
-              CxxUtils.LOG.info("CppCheck issues processed = " + countIssues);
             }
           }
         } catch (RuntimeException e) {
-          parsed = false;
+          throw new XMLStreamException();
+        }
+
+        if (!parsed) {
           throw new XMLStreamException();
         }
       }
@@ -107,10 +107,6 @@ public class CppcheckParserV2 implements CppcheckParser {
     parser.parse(report);
   }
 
-  public boolean hasParsed() {
-    return parsed;
-  }
-  
   @Override
   public String toString() {
     return getClass().getSimpleName();

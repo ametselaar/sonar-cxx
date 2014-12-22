@@ -19,17 +19,6 @@
  */
 package org.sonar.plugins.cxx.rats;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.sonar.api.batch.SensorContext;
-import org.sonar.api.config.Settings;
-import org.sonar.api.profiles.RulesProfile;
-import org.sonar.api.resources.File;
-import org.sonar.api.resources.Project;
-import org.sonar.api.rules.RuleFinder;
-import org.sonar.api.rules.Violation;
-import org.sonar.plugins.cxx.TestUtils;
-
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.mock;
@@ -37,16 +26,31 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.junit.Before;
+import org.junit.Test;
+import org.sonar.api.batch.SensorContext;
+import org.sonar.api.component.ResourcePerspectives;
+import org.sonar.api.config.Settings;
+import org.sonar.api.issue.Issuable;
+import org.sonar.api.issue.Issue;
+import org.sonar.api.profiles.RulesProfile;
+import org.sonar.api.resources.File;
+import org.sonar.api.resources.Project;
+import org.sonar.plugins.cxx.TestUtils;
+
 public class CxxRatsSensorTest {
   private CxxRatsSensor sensor;
   private SensorContext context;
   private Project project;
+  private Issuable issuable;
+  private ResourcePerspectives perspectives;
 
   @Before
   public void setUp() {
     project = TestUtils.mockProject();
-    RuleFinder ruleFinder = TestUtils.mockRuleFinder();
-    sensor = new CxxRatsSensor(ruleFinder, new Settings(), TestUtils.mockFileSystem(), mock(RulesProfile.class));
+    issuable = TestUtils.mockIssuable();
+    perspectives = TestUtils.mockPerspectives(issuable);
+    sensor = new CxxRatsSensor(perspectives, new Settings(), TestUtils.mockFileSystem(), mock(RulesProfile.class));
     context = mock(SensorContext.class);
     File resourceMock = mock(File.class);
     when(context.getResource((File) anyObject())).thenReturn(resourceMock);
@@ -55,6 +59,6 @@ public class CxxRatsSensorTest {
   @Test
   public void shouldReportCorrectViolations() {
     sensor.analyse(project, context);
-    verify(context, times(5)).saveViolation(any(Violation.class));
+    verify(issuable, times(5)).addIssue(any(Issue.class));
   }
 }

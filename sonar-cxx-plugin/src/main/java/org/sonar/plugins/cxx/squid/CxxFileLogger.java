@@ -23,7 +23,7 @@ import java.util.LinkedList;
 
 import com.sonar.sslr.api.AstNode;
 import com.sonar.sslr.api.GenericTokenType;
-import com.sonar.sslr.squid.SquidAstVisitor;
+import org.sonar.squidbridge.SquidAstVisitor;
 
 import org.sonar.cxx.parser.CxxGrammarImpl;
 import org.sonar.plugins.cxx.squid.CxxScope.CxxScopeType;

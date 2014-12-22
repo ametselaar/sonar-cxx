@@ -25,11 +25,11 @@ import org.sonar.check.Rule;
 import org.sonar.check.RuleProperty;
 import org.sonar.cxx.api.CxxMetric;
 import org.sonar.cxx.parser.CxxGrammarImpl;
-import org.sonar.squid.api.SourceFunction;
+import org.sonar.squidbridge.api.SourceFunction;
 import com.sonar.sslr.api.Grammar;
 import com.sonar.sslr.api.AstNode;
-import com.sonar.sslr.squid.checks.ChecksHelper;
-import com.sonar.sslr.squid.checks.SquidCheck;
+import org.sonar.squidbridge.checks.ChecksHelper;
+import org.sonar.squidbridge.checks.SquidCheck;
 
 /* Adapted from FunctionComplexityCheck.java by Arnold Metselaar (CGI). */
 @Rule(key = "FunctionParameterCount", priority = Priority.MAJOR)

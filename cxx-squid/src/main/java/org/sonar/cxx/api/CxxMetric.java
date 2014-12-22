@@ -19,8 +19,8 @@
  */
 package org.sonar.cxx.api;
 
-import org.sonar.squid.measures.CalculatedMetricFormula;
-import org.sonar.squid.measures.MetricDef;
+import org.sonar.squidbridge.measures.CalculatedMetricFormula;
+import org.sonar.squidbridge.measures.MetricDef;
 
 public enum CxxMetric implements MetricDef {
   FILES,
@@ -32,7 +32,9 @@ public enum CxxMetric implements MetricDef {
   COMPLEXITY,
   COMMENT_LINES,
   COMMENT_BLANK_LINES,
-  PARAMETER_COUNT;
+  PARAMETER_COUNT,
+  PUBLIC_API,
+  PUBLIC_UNDOCUMENTED_API;
 
   public String getName() {
     return name();

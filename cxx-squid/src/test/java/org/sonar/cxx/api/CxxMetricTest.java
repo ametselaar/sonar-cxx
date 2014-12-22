@@ -19,15 +19,15 @@
  */
 package org.sonar.cxx.api;
 
-import org.junit.Test;
-
 import static org.fest.assertions.Assertions.assertThat;
+
+import org.junit.Test;
 
 public class CxxMetricTest {
 
   @Test
   public void test() {
-    assertThat(CxxMetric.values()).hasSize(10);
+    assertThat(CxxMetric.values()).hasSize(12);
 
     for (CxxMetric metric : CxxMetric.values()) {
       assertThat(metric.getName()).isEqualTo(metric.name());

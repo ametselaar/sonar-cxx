@@ -20,6 +20,7 @@
 package org.sonar.plugins.cxx.cppcheck;
 
 import java.io.File;
+
 import org.sonar.api.batch.SensorContext;
 import org.sonar.api.resources.Project;
 
@@ -28,8 +29,4 @@ public interface CppcheckParser {
   void processReport(Project project, SensorContext context, File report)
     throws javax.xml.stream.XMLStreamException;
   
-  /**
-   * @return returns true if parser is able to read the file
-   */
-  boolean hasParsed();
 }

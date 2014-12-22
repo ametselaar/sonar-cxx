@@ -19,12 +19,12 @@
  */
 package org.sonar.cxx;
 
-import org.sonar.squid.api.SquidConfiguration;
-
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import org.sonar.squidbridge.api.SquidConfiguration;
 
 public class CxxConfiguration extends SquidConfiguration {
 
@@ -33,8 +33,10 @@ public class CxxConfiguration extends SquidConfiguration {
   private List<String> includeDirectories = new ArrayList<String>();
   private List<String> includeDirectoriesToParse = new ArrayList<String>();
   private List<String> forceIncludeFiles = new ArrayList<String>();
+  private List<String> headerFileSuffixes = new ArrayList<String>();
   private String baseDir;
   private boolean errorRecoveryEnabled = true;
+  private List<String> cFilesPatterns = new ArrayList<String>();
 
   public CxxConfiguration() {
   }
@@ -121,6 +123,30 @@ public class CxxConfiguration extends SquidConfiguration {
 
   public boolean getErrorRecoveryEnabled(){
     return this.errorRecoveryEnabled;
+  }
+
+  public List<String> getCFilesPatterns() {
+    return cFilesPatterns;
+  }
+
+  public void setCFilesPatterns(String[] cFilesPatterns) {
+    if (this.cFilesPatterns != null) {
+      this.cFilesPatterns = Arrays.asList(cFilesPatterns);
+    }
+  }
+
+  public void setHeaderFileSuffixes(List<String> headerFileSuffixes) {
+      this.headerFileSuffixes = headerFileSuffixes;
+  }
+
+  public void setHeaderFileSuffixes(String[] headerFileSuffixes) {
+    if (headerFileSuffixes != null) {
+      setHeaderFileSuffixes(Arrays.asList(headerFileSuffixes));
+    }
+  }
+
+  public List<String> getHeaderFileSuffixes() {
+    return this.headerFileSuffixes;
   }
 
 }

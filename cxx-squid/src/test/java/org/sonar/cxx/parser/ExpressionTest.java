@@ -19,13 +19,9 @@
  */
 package org.sonar.cxx.parser;
 
-import com.sonar.sslr.impl.Parser;
-import com.sonar.sslr.squid.SquidAstVisitorContext;
-import org.junit.Test;
-import com.sonar.sslr.api.Grammar;
-
 import static org.sonar.sslr.tests.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
+
+import org.junit.Test;
 
 public class ExpressionTest extends ParserBaseTest {
 
@@ -519,10 +515,14 @@ public class ExpressionTest extends ParserBaseTest {
     p.setRootRule(g.rule(CxxGrammarImpl.pmExpression));
     g.rule(CxxGrammarImpl.unaryExpression).mock();
     g.rule(CxxGrammarImpl.typeId).mock();
+    g.rule(CxxGrammarImpl.bracedInitList).mock();
 
     assertThat(p).matches("unaryExpression");
     assertThat(p).matches("(typeId) unaryExpression");
     assertThat(p).matches("(typeId)(typeId) unaryExpression");
+
+    // C-COMPATIBILITY: C99 compound literals
+    assertThat(p).matches("(typeId) bracedInitList");
   }
 
   @Test
@@ -532,5 +532,9 @@ public class ExpressionTest extends ParserBaseTest {
     assertThat(p).matches("(istream_iterator<string>(cin))");
     assertThat(p).matches("(Color)c");
     assertThat(p).matches("CDB::mask");
+
+    // C-COMPATIBILITY: C99 compound literals
+    assertThat(p).matches("(Point){ 400, 200 }");
+    assertThat(p).matches("(int []){ 1, 2, 4, 8 }");
   }
 }

@@ -19,25 +19,49 @@
  */
 package org.sonar.cxx.checks;
 
-import com.sonar.sslr.squid.checks.CheckMessagesVerifier;
+import java.io.File;
+
+import junit.framework.Assert;
+
 import org.junit.Test;
 import org.sonar.cxx.CxxAstScanner;
-import org.sonar.squid.api.SourceFile;
-
-import java.io.File;
+import org.sonar.squidbridge.api.SourceFile;
+import org.sonar.squidbridge.checks.CheckMessagesVerifier;
 
 public class TooManyStatementsPerLineCheckTest {
 
-  private TooManyStatementsPerLineCheck check = new TooManyStatementsPerLineCheck();
-
   @Test
   public void test() {
+    TooManyStatementsPerLineCheck check = new TooManyStatementsPerLineCheck();
+    check.excludeCaseBreak = false;
     SourceFile file = CxxAstScanner.scanSingleFile(new File("src/test/resources/checks/TooManyStatementsPerLine.cc"), check);
     CheckMessagesVerifier.verify(file.getCheckMessages())
         .next().atLine(10).withMessage("At most one statement is allowed per line, but 2 statements were found on this line.")
         .next().atLine(13)
         .next().atLine(16)
         .next().atLine(20)
+        .next().atLine(22)
+        .next().atLine(24)
+        .noMore();
+  }
+
+  @Test
+  public void testDefaultExcludeCaseBreak() {
+    TooManyStatementsPerLineCheck check = new TooManyStatementsPerLineCheck();
+    Assert.assertEquals(check.excludeCaseBreak, false);
+  }
+
+  @Test
+  public void testExcludeCaseBreak() {
+    TooManyStatementsPerLineCheck check = new TooManyStatementsPerLineCheck();
+    check.excludeCaseBreak = true;
+    SourceFile file = CxxAstScanner.scanSingleFile(new File("src/test/resources/checks/TooManyStatementsPerLine.cc"), check);
+    CheckMessagesVerifier.verify(file.getCheckMessages())
+        .next().atLine(10).withMessage("At most one statement is allowed per line, but 2 statements were found on this line.")
+        .next().atLine(13)
+        .next().atLine(16)
+        .next().atLine(20)
+        .next().atLine(24)
         .noMore();
   }
 

@@ -19,12 +19,15 @@
  */
 package org.sonar.cxx.checks;
 
-import com.sonar.sslr.api.AstNode;
-import com.sonar.sslr.api.Grammar;
-import com.sonar.sslr.squid.checks.AbstractOneStatementPerLineCheck;
 import org.sonar.check.Priority;
 import org.sonar.check.Rule;
+import org.sonar.check.RuleProperty;
+import org.sonar.cxx.api.CxxKeyword;
 import org.sonar.cxx.parser.CxxGrammarImpl;
+import org.sonar.squidbridge.checks.AbstractOneStatementPerLineCheck;
+
+import com.sonar.sslr.api.AstNode;
+import com.sonar.sslr.api.Grammar;
 
 @Rule(
   key = "TooManyStatementsPerLine",
@@ -32,6 +35,13 @@ import org.sonar.cxx.parser.CxxGrammarImpl;
   priority = Priority.MAJOR)
 
 public class TooManyStatementsPerLineCheck extends AbstractOneStatementPerLineCheck<Grammar> {
+
+  private static final boolean DEFAULT_EXCLUDE_CASE_BREAK = false;
+
+  @RuleProperty(
+      key = "excludeCaseBreak",
+      defaultValue = "" + DEFAULT_EXCLUDE_CASE_BREAK)
+  public boolean excludeCaseBreak = DEFAULT_EXCLUDE_CASE_BREAK;
 
   @Override
   public com.sonar.sslr.api.Rule getStatementRule() {
@@ -54,6 +64,19 @@ public class TooManyStatementsPerLineCheck extends AbstractOneStatementPerLineCh
            prev.isCopyBookOrGeneratedNode();
   }
 
+  /** Exclude 'break' statement if it is on the same line as the switch label (case: or default:).
+   * i.e. the break statement is on the same line as it's "switchBlockStatementGroup" ancestor.
+   */
+  private boolean isBreakStatementExcluded(AstNode astNode)
+  {
+    if (!excludeCaseBreak || astNode.getToken().getType() != CxxKeyword.BREAK)
+      return false;
+
+    AstNode switchGroup = astNode.getFirstAncestor(CxxGrammarImpl.switchBlockStatementGroup);
+    return switchGroup != null
+        && switchGroup.getTokenLine() == astNode.getTokenLine();
+  }
+
   @Override
   public boolean isExcluded(AstNode astNode) {
     AstNode statementNode = astNode.getFirstChild();
@@ -62,6 +85,7 @@ public class TooManyStatementsPerLineCheck extends AbstractOneStatementPerLineCh
       || statementNode.is(CxxGrammarImpl.iterationStatement)
       || statementNode.is(CxxGrammarImpl.labeledStatement)
       || statementNode.is(CxxGrammarImpl.declaration)
-      || (statementNode.isCopyBookOrGeneratedNode() && isGeneratedNodeExcluded(statementNode));
+      || (statementNode.isCopyBookOrGeneratedNode() && isGeneratedNodeExcluded(statementNode))
+      || (statementNode.is(CxxGrammarImpl.jumpStatement) && isBreakStatementExcluded(statementNode));
  }
 }

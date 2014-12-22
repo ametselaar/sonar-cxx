@@ -19,19 +19,6 @@
  */
 package org.sonar.plugins.cxx.pclint;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.sonar.api.batch.SensorContext;
-import org.sonar.api.config.Settings;
-import org.sonar.api.profiles.RulesProfile;
-import org.sonar.api.resources.File;
-import org.sonar.api.resources.Project;
-import org.sonar.api.rules.RuleFinder;
-import org.sonar.api.rules.Violation;
-import org.sonar.plugins.cxx.TestUtils;
-import org.sonar.api.utils.SonarException;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
-
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.mock;
@@ -39,18 +26,34 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.junit.Before;
+import org.junit.Test;
+import org.sonar.api.batch.SensorContext;
+import org.sonar.api.component.ResourcePerspectives;
+import org.sonar.api.config.Settings;
+import org.sonar.api.issue.Issuable;
+import org.sonar.api.issue.Issue;
+import org.sonar.api.profiles.RulesProfile;
+import org.sonar.api.resources.File;
+import org.sonar.api.resources.Project;
+import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import org.sonar.api.utils.SonarException;
+import org.sonar.plugins.cxx.TestUtils;
+
 public class CxxPCLintSensorTest {
   private SensorContext context;
   private Project project;
   private RulesProfile profile;
-  private RuleFinder ruleFinder;
+  private ResourcePerspectives perspectives;
+  private Issuable issuable;
   private ModuleFileSystem fs;
 
   @Before
   public void setUp() {
     project = TestUtils.mockProject();
     fs = TestUtils.mockFileSystem();
-    ruleFinder = TestUtils.mockRuleFinder();
+    issuable = TestUtils.mockIssuable();
+    perspectives = TestUtils.mockPerspectives(issuable);
     profile = mock(RulesProfile.class);
     context = mock(SensorContext.class);
     File resourceMock = mock(File.class);
@@ -61,25 +64,25 @@ public class CxxPCLintSensorTest {
   public void shouldReportCorrectViolations() {
     Settings settings = new Settings();
     settings.setProperty(CxxPCLintSensor.REPORT_PATH_KEY, "pclint-reports/pclint-result-SAMPLE.xml");
-    CxxPCLintSensor sensor = new CxxPCLintSensor(ruleFinder, settings, fs, profile);
+    CxxPCLintSensor sensor = new CxxPCLintSensor(perspectives, settings, fs, profile);
     sensor.analyse(project, context);
-    verify(context, times(15)).saveViolation(any(Violation.class));
+    verify(issuable, times(15)).addIssue(any(Issue.class));
   }
 
   @Test
   public void shouldReportCorrectMisra2004Violations() {
     Settings settings = new Settings();
     settings.setProperty(CxxPCLintSensor.REPORT_PATH_KEY, "pclint-reports/pclint-result-MISRA2004-SAMPLE.xml");
-    CxxPCLintSensor sensor = new CxxPCLintSensor(ruleFinder, settings, fs, profile);
+    CxxPCLintSensor sensor = new CxxPCLintSensor(perspectives, settings, fs, profile);
     sensor.analyse(project, context);
-    verify(context, times(29)).saveViolation(any(Violation.class));
+    verify(issuable, times(29)).addIssue(any(Issue.class));
   }
 
   @Test(expected=SonarException.class)
   public void shouldThrowExceptionWhenMisra2004DescIsWrong() {
     Settings settings = new Settings();
     settings.setProperty(CxxPCLintSensor.REPORT_PATH_KEY, "pclint-reports/incorrect-pclint-MISRA2004-desc.xml");
-    CxxPCLintSensor sensor = new CxxPCLintSensor(ruleFinder, settings, fs, profile);
+    CxxPCLintSensor sensor = new CxxPCLintSensor(perspectives, settings, fs, profile);
     sensor.analyse(project, context);
   }
 
@@ -87,7 +90,7 @@ public class CxxPCLintSensorTest {
   public void shouldThrowExceptionWhenMisra2004RuleDoNotExist() {
     Settings settings = new Settings();
     settings.setProperty(CxxPCLintSensor.REPORT_PATH_KEY, "pclint-reports/incorrect-pclint-MISRA2004-rule-do-not-exist.xml");
-    CxxPCLintSensor sensor = new CxxPCLintSensor(ruleFinder, settings, fs, profile);
+    CxxPCLintSensor sensor = new CxxPCLintSensor(perspectives, settings, fs, profile);
     sensor.analyse(project, context);
   }
 
@@ -95,25 +98,25 @@ public class CxxPCLintSensorTest {
   public void shouldNotRemapMisra1998Rules() {
     Settings settings = new Settings();
     settings.setProperty(CxxPCLintSensor.REPORT_PATH_KEY, "pclint-reports/pclint-result-MISRA1998-SAMPLE.xml");
-    CxxPCLintSensor sensor = new CxxPCLintSensor(ruleFinder, settings, fs, profile);
+    CxxPCLintSensor sensor = new CxxPCLintSensor(perspectives, settings, fs, profile);
     sensor.analyse(project, context);
-    verify(context, times(1)).saveViolation(any(Violation.class));
+    verify(issuable, times(1)).addIssue(any(Issue.class));
   }
 
   @Test
   public void shouldReportProjectLevelViolations() {
     Settings settings = new Settings();
     settings.setProperty(CxxPCLintSensor.REPORT_PATH_KEY, "pclint-reports/pclint-result-projectlevelviolation.xml");
-    CxxPCLintSensor sensor = new CxxPCLintSensor(ruleFinder, settings, fs, profile);
+    CxxPCLintSensor sensor = new CxxPCLintSensor(perspectives, settings, fs, profile);
     sensor.analyse(project, context);
-    verify(context, times(1)).saveViolation(any(Violation.class));
+    verify(issuable, times(1)).addIssue(any(Issue.class));
   }
 
   @Test
   public void shouldThrowExceptionInvalidChar() {
     Settings settings = new Settings();
     settings.setProperty(CxxPCLintSensor.REPORT_PATH_KEY, "pclint-reports/pclint-result-invalid-char.xml");
-    CxxPCLintSensor sensor = new CxxPCLintSensor(ruleFinder, settings, fs, profile);
+    CxxPCLintSensor sensor = new CxxPCLintSensor(perspectives, settings, fs, profile);
     sensor.analyse(project, context);
   }
 }

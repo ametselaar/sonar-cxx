@@ -19,24 +19,24 @@
  */
 package org.sonar.plugins.cxx.valgrind;
 
-import org.junit.Test;
-import org.sonar.api.platform.ServerFileSystem;
-import org.sonar.api.rules.XMLRuleParser;
-import org.sonar.plugins.cxx.TestUtils;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.util.ArrayList;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.Test;
 import org.sonar.api.config.Settings;
+import org.sonar.api.platform.ServerFileSystem;
+import org.sonar.api.rules.XMLRuleParser;
+import org.sonar.plugins.cxx.TestUtils;
 
 public class CxxValgrindRuleRepositoryTest {
   @Test
   public void shouldContainProperNumberOfRules() {
     CxxValgrindRuleRepository repo = new CxxValgrindRuleRepository(mock(ServerFileSystem.class), new XMLRuleParser(), new Settings());
-    assertEquals(repo.createRules().size(), 15);
+    assertEquals(repo.createRules().size(), 16);
   }
 
   @Test
@@ -46,7 +46,7 @@ public class CxxValgrindRuleRepositoryTest {
     extensionFile.add(TestUtils.loadResource("/org/sonar/plugins/cxx/rules-repository/CustomRulesOldFormat.xml"));
     when(filesystem.getExtensions(CxxValgrindRuleRepository.KEY, "xml")).thenReturn(extensionFile);
     CxxValgrindRuleRepository repo = new CxxValgrindRuleRepository(filesystem, new XMLRuleParser(), new Settings());
-    assertEquals(repo.createRules().size(), 17);
+    assertEquals(repo.createRules().size(), 18);
   }
 
   @Test
@@ -56,7 +56,7 @@ public class CxxValgrindRuleRepositoryTest {
     extensionFile.add(TestUtils.loadResource("/org/sonar/plugins/cxx/rules-repository/CustomRulesNewFormat.xml"));
     when(filesystem.getExtensions(CxxValgrindRuleRepository.KEY, "xml")).thenReturn(extensionFile);
     CxxValgrindRuleRepository repo = new CxxValgrindRuleRepository(filesystem, new XMLRuleParser(), new Settings());
-    assertEquals(repo.createRules().size(), 16);
+    assertEquals(repo.createRules().size(), 17);
   }
 
   @Test(expected = org.sonar.api.utils.SonarException.class)

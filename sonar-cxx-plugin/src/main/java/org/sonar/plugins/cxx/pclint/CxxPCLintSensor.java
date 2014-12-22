@@ -19,26 +19,26 @@
  */
 package org.sonar.plugins.cxx.pclint;
 
+import java.io.File;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.xml.stream.XMLStreamException;
+
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.staxmate.in.SMHierarchicCursor;
 import org.codehaus.staxmate.in.SMInputCursor;
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.component.ResourcePerspectives;
 import org.sonar.api.config.Settings;
 import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Project;
-import org.sonar.api.rules.RuleFinder;
+import org.sonar.api.scan.filesystem.ModuleFileSystem;
 import org.sonar.api.utils.StaxParser;
+import org.sonar.plugins.cxx.CxxMetrics;
 import org.sonar.plugins.cxx.utils.CxxReportSensor;
 import org.sonar.plugins.cxx.utils.CxxUtils;
 import org.sonar.plugins.cxx.utils.EmptyReportException;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
-
-import javax.xml.stream.XMLStreamException;
-
-import java.io.File;
-import java.util.HashSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * PC-lint is an equivalent to pmd but for C++
@@ -56,8 +56,8 @@ public class CxxPCLintSensor extends CxxReportSensor {
   /**
    * {@inheritDoc}
    */
-  public CxxPCLintSensor(RuleFinder ruleFinder, Settings conf, ModuleFileSystem fs, RulesProfile profile) {
-    super(ruleFinder, conf, fs);
+  public CxxPCLintSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs, RulesProfile profile) {
+    super(perspectives, conf, fs, CxxMetrics.PCLINT);
     this.profile = profile;
   }
 
@@ -98,7 +98,6 @@ public class CxxPCLintSensor extends CxxReportSensor {
         }
 
         SMInputCursor errorCursor = rootCursor.childElementCursor("issue");
-        int countViolations = 0;
         try {
         while (errorCursor.getNext() != null){
 
@@ -111,17 +110,14 @@ public class CxxPCLintSensor extends CxxReportSensor {
               if(msg.contains("MISRA 2004") || msg.contains("MISRA 2008")) {
                   id = mapMisraRulesToUniqueSonarRules(msg);
               }
-              if (saveUniqueViolation(project, context, CxxPCLintRuleRepository.KEY,
-                                      file, line, id, msg)) {
-                countViolations++;
-              }
+              saveUniqueViolation(project, context, CxxPCLintRuleRepository.KEY,
+                                  file, line, id, msg);
             } else {
               CxxUtils.LOG.warn("PC-lint warning ignored: {}", msg);
               CxxUtils.LOG.debug("File: " + file + ", Line: " + line + ", ID: "
                   + id + ", msg: " + msg);
             }
          }
-        CxxUtils.LOG.info("PC-lint issues processed = " + countViolations);
         } catch (com.ctc.wstx.exc.WstxUnexpectedCharException e) {
           CxxUtils.LOG.error("Ignore XML error from PC-lint '{}'", e.toString());
         }
