@@ -42,7 +42,6 @@ import org.sonar.api.measures.CoreMetrics;
 import org.sonar.api.measures.Measure;
 import org.sonar.api.measures.PersistenceMode;
 import org.sonar.api.measures.RangeDistributionBuilder;
-import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Language;
 import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.resources.ResourceUtils;
@@ -55,7 +54,7 @@ import org.sonar.cxx.api.CxxMetric;
 import org.sonar.cxx.checks.CheckList;
 import org.sonar.cxx.parser.CxxParser;
 import org.sonar.plugins.cxx.CxxLanguage;
-import org.sonar.plugins.cxx.CxxMetrics;
+import org.sonar.plugins.cxx.utils.CxxMetrics;
 import org.sonar.plugins.cxx.CxxPlugin;
 import org.sonar.squidbridge.AstScanner;
 import org.sonar.squidbridge.SquidAstVisitor;
@@ -68,7 +67,6 @@ import org.sonar.squidbridge.indexer.QueryByType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
 import com.sonar.sslr.api.Grammar;
 
 /**
@@ -92,7 +90,7 @@ public final class CxxSquidSensor implements Sensor {
   /**
    * {@inheritDoc}
    */
-  public CxxSquidSensor(ResourcePerspectives perspectives, RulesProfile profile, Settings conf,
+  public CxxSquidSensor(ResourcePerspectives perspectives, Settings conf,
                         ModuleFileSystem fs, CheckFactory checkFactory, ActiveRules rules) {
     this.checks = checkFactory.create(CheckList.REPOSITORY_KEY).addAnnotatedChecks(CheckList.getChecks());
     this.rules = rules;
@@ -114,16 +112,16 @@ public final class CxxSquidSensor implements Sensor {
 
     List<SquidAstVisitor<Grammar>> visitors = new ArrayList<SquidAstVisitor<Grammar>>((Collection) checks.all());
     visitors.add(new CxxFileLogger());
-    this.scanner = CxxAstScanner.create(createConfiguration(project, conf),
+    this.scanner = CxxAstScanner.create(createConfiguration(this.fs, this.conf),
                                         visitors.toArray(new SquidAstVisitor[visitors.size()]));
 
-    scanner.scanFiles(fs.files(CxxLanguage.sourceQuery));
+    scanner.scanFiles(fs.files(CxxLanguage.SOURCE_QUERY));
 
     Collection<SourceCode> squidSourceFiles = scanner.getIndex().search(new QueryByType(SourceFile.class));
     save(squidSourceFiles);
   }
 
-  private CxxConfiguration createConfiguration(Project project, Settings conf) {
+  private CxxConfiguration createConfiguration(ModuleFileSystem fs, Settings conf) {
     CxxConfiguration cxxConf = new CxxConfiguration(fs.sourceCharset());
     cxxConf.setBaseDir(fs.baseDir().getAbsolutePath());
     String[] lines = conf.getStringLines(CxxPlugin.DEFINES_KEY);

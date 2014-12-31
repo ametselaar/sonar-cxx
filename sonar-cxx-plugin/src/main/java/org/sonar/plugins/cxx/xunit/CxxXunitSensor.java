@@ -73,13 +73,16 @@ public class CxxXunitSensor extends CxxReportSensor {
   public static final String PROVIDE_DETAILS_KEY = "sonar.cxx.xunit.provideDetails";
 
   private static final String DEFAULT_REPORT_PATH = "xunit-reports/xunit-result-*.xml";
+  private static final double PERCENT_BASE = 100d;
+
   private String xsltURL = null;
   private Map<String, String> classDeclTable = new TreeMap<String, String>();
   private Map<String, String> classImplTable = new TreeMap<String, String>();
-  static Pattern classNameMatchingPattern = Pattern.compile("(?:\\w*::)*?(\\w+?)::\\w+?:\\d+$");
-  private final static double PERCENT_BASE = 100d;
-
   private ResourceFinder resourceFinder = null;
+  private int tcTotal = 0;
+  private int tcSkipped = 0;
+
+  static Pattern classNameMatchingPattern = Pattern.compile("(?:\\w*::)*?(\\w+?)::\\w+?:\\d+$");
 
   /**
    * {@inheritDoc}
@@ -199,10 +202,7 @@ public class CxxXunitSensor extends CxxReportSensor {
     for (TestResource resource : locatedResources) {
       saveTestMetrics(context, resource);
     }
-
-    //report processed, testcases processed, testcases skipped, resources found
-    //CxxUtils.LOG.info("{} processed = {}", metric == null ? "Issues" : metric.getName(),
-    //                  violationsCount - prevViolationsCount);
+    CxxUtils.LOG.info("Summary: testcases processed = {}, skipped = {}", tcTotal, tcSkipped);
   }
 
 
@@ -210,6 +210,8 @@ public class CxxXunitSensor extends CxxReportSensor {
     Map<String, TestResource> resources = new HashMap<String, TestResource>();
 
     for (TestCase tc : testcases) {
+      tcTotal++;
+
       CxxUtils.LOG.debug("Trying the resource for the testcase '{}' ...", tc.getFullname());
       org.sonar.api.resources.File sonarResource = lookupResource(project, context, tc);
       if (sonarResource != null) {
@@ -223,6 +225,7 @@ public class CxxXunitSensor extends CxxReportSensor {
 
         resource.addTestCase(tc);
       } else {
+        tcSkipped++;
         CxxUtils.LOG.warn("... no resource found, the testcase '{}' has to be skipped",
                           tc.getFullname());
       }
@@ -323,7 +326,7 @@ public class CxxXunitSensor extends CxxReportSensor {
   }
 
   void buildLookupTables() {
-    List<File> files = fs.files(CxxLanguage.testQuery);
+    List<File> files = fs.files(CxxLanguage.TEST_QUERY);
 
     CxxConfiguration cxxConf = new CxxConfiguration(fs.sourceCharset());
     cxxConf.setBaseDir(fs.baseDir().getAbsolutePath());
@@ -350,12 +353,6 @@ public class CxxXunitSensor extends CxxReportSensor {
         }
       }
     }
-
-    filterMapUsingKeyList(classImplTable, classDeclTable.keySet());
-  }
-
-  private Map<String, String> filterMapUsingKeyList(Map<String, String> map, Collection keys){
-    return map;
   }
 
   String matchClassName(String fullQualFunctionName){

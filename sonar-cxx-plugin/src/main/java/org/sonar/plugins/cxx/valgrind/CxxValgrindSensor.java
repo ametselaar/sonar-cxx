@@ -29,9 +29,9 @@ import org.sonar.api.measures.Metric;
 import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Project;
 import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import org.sonar.plugins.cxx.utils.CxxMetrics;
 import org.sonar.api.resources.Resource;
 import org.sonar.api.rules.RuleFinder;
-import org.sonar.plugins.cxx.CxxMetrics;
 import org.sonar.plugins.cxx.utils.CxxReportSensor;
 import org.sonar.plugins.cxx.utils.CxxUtils;
 

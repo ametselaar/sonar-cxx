@@ -17,7 +17,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02
  */
-package org.sonar.plugins.cxx;
+package org.sonar.plugins.cxx.utils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -31,6 +31,9 @@ import org.sonar.api.measures.SumChildValuesFormula;
 import org.sonar.api.rules.Rule;
 import org.sonar.api.rules.XMLRuleParser;
 
+/**
+ * {@inheritDoc}
+ */
 public class CxxMetrics implements Metrics {
 public static final Metric COMPILER = new Metric.Builder("CXX-COMPILER", "C++ compiler Warnings", Metric.ValueType.INT)
       .setDirection(Metric.DIRECTION_WORST)

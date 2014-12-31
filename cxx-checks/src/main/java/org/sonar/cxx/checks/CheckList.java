@@ -41,6 +41,8 @@ public final class CheckList {
         DuplicatedIncludeCheck.class,
         FileComplexityCheck.class,
         FileHeaderCheck.class,
+        FileEncodingCheck.class,
+        FileRegularExpressionCheck.class,
         FixmeTagPresenceCheck.class,
         FunctionComplexityCheck.class,
         FunctionParameterCountCheck.class,
@@ -70,7 +72,8 @@ public final class CheckList {
         UsingNamespaceInHeaderCheck.class,
         SafetyTagCheck.class,
         UseCorrectIncludeCheck.class,
-        XPathCheck.class);
+        XPathCheck.class
+    );
   }
 
 }

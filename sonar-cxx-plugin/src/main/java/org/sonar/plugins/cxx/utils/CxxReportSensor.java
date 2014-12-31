@@ -24,8 +24,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.Collections;
 
-import org.apache.tools.ant.DirectoryScanner;
 import org.sonar.api.batch.Sensor;
 import org.sonar.api.batch.SensorContext;
 import org.sonar.api.component.ResourcePerspectives;
@@ -38,59 +39,60 @@ import org.sonar.api.resources.Project;
 import org.sonar.api.resources.Resource;
 import org.sonar.api.rule.RuleKey;
 import org.sonar.api.rules.Rule;
-import org.sonar.api.rules.RuleQuery;
-import org.sonar.api.rules.Violation;
 import org.sonar.api.scan.filesystem.ModuleFileSystem;
 import org.sonar.api.utils.SonarException;
 import org.sonar.plugins.cxx.CxxLanguage;
+import org.apache.commons.io.FilenameUtils;
+import org.sonar.api.utils.WildcardPattern;
 
 import java.util.Map.Entry;
 
 
 /**
- * {@inheritDoc}
+ * This class is used as base for all sensors which import reports.
+ * It hosts common logic such as finding the reports and saving issues
+ * in SonarQube
  */
 public abstract class CxxReportSensor implements Sensor {
   private ResourcePerspectives perspectives;
-  protected Settings conf;
-  private HashSet<String> notFoundFiles = new HashSet<String>();
-  private HashSet<String> uniqueIssues = new HashSet<String>();
-  protected ModuleFileSystem fs;
+  private Set<String> notFoundFiles = new HashSet<String>();
+  private Set<String> uniqueIssues = new HashSet<String>();
   private class AdditiveMeasure {
-	  public Metric metric;
-	  public double value;
-	  public AdditiveMeasure(Metric metric, double value) {
-		  this.metric = metric;
-		  this.value = value;
-	  }
+    public Metric metric;
+    public double value;
+    public AdditiveMeasure(Metric metric, double value) {
+      this.metric = metric;
+      this.value = value;
+    }
   }
   private HashMap<Resource, ArrayList<AdditiveMeasure> > measures = new HashMap<Resource, ArrayList<AdditiveMeasure> >();
-
   private final Metric metric;
   private int violationsCount;
 private HashMap<String, Rule> ruleCache;
 
+  protected ModuleFileSystem fs;
+  protected Settings conf;
+
   /**
-   * {@inheritDoc}
+   * Use this constructor if you dont have to save violations aka issues
+   *
+   * @param conf the Settings object used to access the configuration properties
+   * @param fs   file system access layer
    */
-  public CxxReportSensor(Settings conf, ModuleFileSystem fs) {
-    this(null, conf, fs);
+  protected CxxReportSensor(Settings conf, ModuleFileSystem fs) {
+    this(null, conf, fs, null);
   }
 
   /**
-   * {@inheritDoc}
+   * Use this constructor if your sensor implementation saves violations aka issues
+   *
+   * @param perspectives used to create issuables
+   * @param conf         the Settings object used to access the configuration properties
+   * @param fs           file system access layer
+   * @param metric       this metrics will be used to save a measure of the overall
+   *                     issue count. Pass 'null' to skip this.
    */
-  public CxxReportSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs) {
-    this.perspectives = perspectives;
-    this.conf = conf;
-    this.fs = fs;
-    this.metric = null;
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  public CxxReportSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs, Metric metric) {
+  protected CxxReportSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs, Metric metric) {
     this.perspectives = perspectives;
     this.conf = conf;
     this.fs = fs;
@@ -121,20 +123,15 @@ private HashMap<String, Rule> ruleCache;
           processReport(project, context, report);
           CxxUtils.LOG.info("{} processed = {}", metric == null ? "Issues" : metric.getName(),
                             violationsCount - prevViolationsCount);
-        }
-        catch(EmptyReportException e){
+        } catch(EmptyReportException e){
           CxxUtils.LOG.warn("The report '{}' seems to be empty, ignoring.", report);
         }
       }
 
-      if (reports.isEmpty()) {
-        handleNoReportsCase(context);
-      }
-      
       for (Entry<Resource, ArrayList<AdditiveMeasure>> entry: measures.entrySet()){
-    	  for (AdditiveMeasure m : entry.getValue()) {
-    		  context.saveMeasure(entry.getKey(), m.metric, m.value);
-    	  }
+        for (AdditiveMeasure m : entry.getValue()) {
+          context.saveMeasure(entry.getKey(), m.metric, m.value);
+        }
       }
 
       if (metric != null) {
@@ -145,10 +142,10 @@ private HashMap<String, Rule> ruleCache;
       measures = new HashMap<Resource, ArrayList<AdditiveMeasure>>();
     } catch (Exception e) {
       String msg = new StringBuilder()
-          .append("Cannot feed the data into sonar, details: '")
-          .append(e)
-          .append("'")
-          .toString();
+        .append("Cannot feed the data into sonar, details: '")
+        .append(e)
+        .append("'")
+        .toString();
       throw new SonarException(msg, e);
     }
   }
@@ -158,7 +155,7 @@ private HashMap<String, Rule> ruleCache;
     return getClass().getSimpleName();
   }
 
-  public String getStringProperty(String name, String def) {
+  protected String getStringProperty(String name, String def) {
       String value = conf.getString(name);
       if (value == null)
           value = def;
@@ -173,23 +170,18 @@ private HashMap<String, Rule> ruleCache;
     if (reportPath == null) {
       reportPath = defaultReportPath;
     }
+    reportPath = FilenameUtils.normalize(reportPath);
 
     CxxUtils.LOG.debug("Using pattern '{}' to find reports", reportPath);
 
-    DirectoryScanner scanner = new DirectoryScanner();
-    String[] includes = new String[1];
-    includes[0] = reportPath;
-    scanner.setIncludes(includes);
-    scanner.setBasedir(new File(baseDirPath));
-    scanner.scan();
-    String[] relPaths = scanner.getIncludedFiles();
-
-    List<File> reports = new ArrayList<File>();
-    for (String relPath : relPaths) {
-      reports.add(new File(baseDirPath, relPath));
+    if(new File(reportPath).isAbsolute()){
+      CxxUtils.LOG.error("Absolute paths are not supported ({})", reportPath);
+      return Collections.emptyList();
     }
 
-    return reports;
+    DirectoryScanner scanner = new DirectoryScanner(new File(baseDirPath),
+                                                    WildcardPattern.create(reportPath));
+    return scanner.getIncludedFiles();
   }
 
   /**
@@ -212,43 +204,59 @@ private HashMap<String, Rule> ruleCache;
    * according parameters ('file' = null for project level, 'line' = null for
    * file-level)
    */
-  public boolean saveViolation(Project project, SensorContext context, String ruleRepoKey,
+  private boolean saveViolation(Project project, SensorContext context, String ruleRepoKey,
     String filename, String line, String ruleId, String msg) {
-    Resource resource = findResource(project, context, filename, line);
-    boolean add = (resource != null);
+    boolean add = false;
+    Resource resource = null;
     int lineNr = 0;
 
-    if (add && (resource != project)) {
-    	lineNr = getLineAsInt(line);
+    if ((filename != null) && (filename.length() > 0)) { // file level
+      String normalPath = CxxUtils.normalizePath(filename);
+      if (normalPath != null && !notFoundFiles.contains(normalPath)) {
+        org.sonar.api.resources.File file
+          = org.sonar.api.resources.File.fromIOFile(new File(normalPath), project);
+        if (context.getResource(file) != null) {
+          lineNr = getLineAsInt(line);
+          resource = file;
+          add = true;
+        } else {
+          CxxUtils.LOG.warn("Cannot find the file '{}', skipping violations", normalPath);
+          notFoundFiles.add(normalPath);
+        }
+      }
+    } else { // project level
+      resource = project;
+      add = true;
     }
+
     if (add) {
-        contextSaveViolation(resource, lineNr, RuleKey.of(ruleRepoKey, ruleId), msg);
+      add = contextSaveViolation(resource, lineNr, RuleKey.of(ruleRepoKey, ruleId), msg);
     }
 
     return add;
   }
   
   protected void addToMeasure(Resource resource, Metric metric, double delta) {
-	  ArrayList<AdditiveMeasure> m = null;
-	  if (measures.containsKey(resource)) {
-		  m = measures.get(resource);
-		  boolean done = false;
-		  for (int i=0 ; i < m.size(); i++) {
-			  if (m.get(i).metric == metric) {
-				  m.get(i).value += delta;
-				  done = true;
-				  break;
-			  }
-		  }
-		  if (!done) {
-			  m.add(new AdditiveMeasure(metric, delta));
-		  }
-	  }
-	  else {
-		  m = new ArrayList<AdditiveMeasure> ();
-		  m.add(new AdditiveMeasure(metric, delta));
-	  }
-	  measures.put(resource, m);	  
+    ArrayList<AdditiveMeasure> m = null;
+    if (measures.containsKey(resource)) {
+      m = measures.get(resource);
+      boolean done = false;
+      for (int i = 0 ; i < m.size(); i++) {
+        if (m.get(i).metric == metric) {
+          m.get(i).value += delta;
+          done = true;
+          break;
+        }
+      }
+      if (!done) {
+        m.add(new AdditiveMeasure(metric, delta));
+      }
+    }
+    else {
+      m = new ArrayList<AdditiveMeasure> ();
+      m.add(new AdditiveMeasure(metric, delta));
+    }
+    measures.put(resource, m);
   }
 
   /**
@@ -258,33 +266,42 @@ private HashMap<String, Rule> ruleCache;
    * @todo Find resources below file level.
    */
   public Resource findResource(Project project, SensorContext context, String filename, String line)  {
-	  Resource resource = null;
-	  if ((filename != null) && (filename.length() > 0)) { // file level
-		  String normalPath = CxxUtils.normalizePath(filename);
-		  if (normalPath != null) {
-			  if (!notFoundFiles.contains(normalPath)) {
-				  org.sonar.api.resources.File file
-				  = org.sonar.api.resources.File.fromIOFile(new File(normalPath), project);
-				  resource = context.getResource(file);
-				  if ( resource == null) {
-					  CxxUtils.LOG.warn("Cannot find the file '{}', skipping violations", normalPath);
-					  notFoundFiles.add(normalPath);
-				  }
-			  }
-		  }
-	  } else { // project level
-		  resource = project;
-	  }
-	  return resource;
+    Resource resource = null;
+    if ((filename != null) && (filename.length() > 0)) { // file level
+      String normalPath = CxxUtils.normalizePath(filename);
+      if (normalPath != null && !notFoundFiles.contains(normalPath)) {
+        org.sonar.api.resources.File file
+        = org.sonar.api.resources.File.fromIOFile(new File(normalPath), project);
+          if (context.getResource(file) != null) {
+            int lineNr = getLineAsInt(line);
+            resource = file;
+          } else {
+            CxxUtils.LOG.warn("Cannot find the file '{}', skipping violations", normalPath);
+            notFoundFiles.add(normalPath);
+          }
+        }
+    } else { // project level
+      resource = project;
+    }
+    return resource;
   }
-  private void contextSaveViolation(SensorContext context, Resource resource, int lineNr, Rule rule, String msg) {
-	    Violation violation = Violation.create(rule, resource);
-	    if (lineNr > 0) {
-	      violation.setLineId(lineNr);
-	    }
-	    violation.setMessage(msg);
-	    context.saveViolation(violation);
-	  }
+  private boolean contextSaveViolation(SensorContext context, Resource resource, int lineNr, RuleKey rule, String msg) {
+    Issuable issuable = perspectives.as(Issuable.class, resource); 
+    boolean result = false; 
+    if (issuable != null) { 
+      Issuable.IssueBuilder issueBuilder = issuable.newIssueBuilder() 
+          .ruleKey(rule) 
+          .message(msg); 
+      if (lineNr > 0) { 
+        issueBuilder = issueBuilder.line(lineNr); 
+      } 
+      Issue issue = issueBuilder.build(); 
+      result = issuable.addIssue(issue); 
+      if (result) 
+        violationsCount++; 
+    } 
+    return result; 
+  }
 
   private boolean contextSaveViolation(Resource resource, int lineNr, RuleKey rule, String msg) {
     Issuable issuable = perspectives.as(Issuable.class, resource);
@@ -323,14 +340,11 @@ private HashMap<String, Rule> ruleCache;
   {
   }
 
-  protected void handleNoReportsCase(SensorContext context) {
-  }
-
   protected String reportPathKey() {
     return "";
-  };
+  }
 
   protected String defaultReportPath() {
     return "";
-  };
+  }
 }

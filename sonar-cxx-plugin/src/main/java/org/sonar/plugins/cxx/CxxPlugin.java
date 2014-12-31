@@ -46,9 +46,13 @@ import org.sonar.plugins.cxx.valgrind.CxxValgrindSensor;
 import org.sonar.plugins.cxx.veraxx.CxxVeraxxRuleRepository;
 import org.sonar.plugins.cxx.veraxx.CxxVeraxxSensor;
 import org.sonar.plugins.cxx.xunit.CxxXunitSensor;
+import org.sonar.plugins.cxx.utils.CxxMetrics;
 
 import com.google.common.collect.ImmutableList;
 
+/**
+ * {@inheritDoc}
+ */
 public final class CxxPlugin extends SonarPlugin {
   static final String SOURCE_FILE_SUFFIXES_KEY = "sonar.cxx.suffixes.sources";
   public static final String HEADER_FILE_SUFFIXES_KEY = "sonar.cxx.suffixes.headers";
@@ -59,7 +63,7 @@ public final class CxxPlugin extends SonarPlugin {
   public static final String C_FILES_PATTERNS_KEY = "sonar.cxx.cFilesPatterns";
   public static final String INCLUDE_DIRECTORIES_PARSE_KEY = "sonar.cxx.includeDirectoriesToParse";
 
-  public static List<PropertyDefinition> generalProperties() {
+  private static List<PropertyDefinition> generalProperties() {
     String subcateg = "(1) General";
     return ImmutableList.of(
       PropertyDefinition.builder(SOURCE_FILE_SUFFIXES_KEY)
@@ -119,7 +123,7 @@ public final class CxxPlugin extends SonarPlugin {
       .defaultValue("")
       .name("Include directories with parsing")
       .description("Comma-separated list of directories with include files that should be fully parsed instead of scanned for defines only. "
-    		  + "This setting has no effect on the search path for include files.")
+              + "This setting has no effect on the search path for include files.")
       .subCategory(subcateg)
       .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
       .type(PropertyType.TEXT)
@@ -137,7 +141,7 @@ public final class CxxPlugin extends SonarPlugin {
       );
   }
 
-  public static List<PropertyDefinition> codeAnalysisProperties() {
+  private static List<PropertyDefinition> codeAnalysisProperties() {
     String subcateg = "(2) Code analysis";
     return ImmutableList.of(
       PropertyDefinition.builder(CxxCppCheckSensor.REPORT_PATH_KEY)
@@ -254,7 +258,7 @@ public final class CxxPlugin extends SonarPlugin {
       );
   }
 
-  public static List<PropertyDefinition> compilerWarningsProperties() {
+  private static List<PropertyDefinition> compilerWarningsProperties() {
     String subcateg = "(4) Compiler warnings";
     return ImmutableList.of(
       PropertyDefinition.builder(CxxCompilerSensor.REPORT_PATH_KEY)
@@ -313,7 +317,7 @@ public final class CxxPlugin extends SonarPlugin {
       );
   }
 
-  public static List<PropertyDefinition> testingAndCoverageProperties() {
+  private static List<PropertyDefinition> testingAndCoverageProperties() {
     String subcateg = "(3) Testing & Coverage";
     return ImmutableList.of(
       PropertyDefinition.builder(CxxCoverageSensor.REPORT_PATH_KEY)
@@ -356,7 +360,7 @@ public final class CxxPlugin extends SonarPlugin {
       .type(PropertyType.BOOLEAN)
       .index(4)
       .build(),
-      
+
       PropertyDefinition.builder(CxxXunitSensor.REPORT_PATH_KEY)
       .name("Unit test execution report(s)")
       .description("Path to unit test execution report(s), relative to projects root."
@@ -385,7 +389,7 @@ public final class CxxPlugin extends SonarPlugin {
       .onQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE)
       .type(PropertyType.BOOLEAN)
       .index(7)
-      .build()      
+      .build()
       );
   }
 
@@ -394,7 +398,6 @@ public final class CxxPlugin extends SonarPlugin {
    */
   public List getExtensions() {
     List<Object> l = new ArrayList<Object>();
-    l.add(CxxMetrics.class);
     l.add(CxxLanguage.class);
     l.add(CxxColorizer.class);
     l.add(CxxMetrics.class);
