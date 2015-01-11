@@ -1,5 +1,7 @@
 #include <iostream>
 #include <memory>
+#include <vector>
+#include <utility>
 using namespace std;
 
 
@@ -18,3 +20,7 @@ int var2;
 long var3;
 long long var4;
 unsigned long var5;
+std::vector<std::vector<int> > oldStyle;
+vector<vector<int>> newStyle;
+std::pair<const char*, std::vector<long int>> longNewStyle;
+
