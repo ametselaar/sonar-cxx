@@ -195,6 +195,7 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
   restrictQualifier,
   declaratorId,
   typeId,
+  typeIdEnclosed,
   abstractDeclarator,
   ptrAbstractDeclarator,
   noptrAbstractDeclarator,
@@ -251,13 +252,16 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
   // Templates
   templateDeclaration,
   templateParameterList,
+  templateParameterListEnclosed,
   templateParameter,
   typeParameter,
+  innerTypeParameter,
   simpleTemplateId,
   templateId,
   templateName,
   templateArgumentList,
   templateArgument,
+  innerTypeId,
   innerTemplateId,
   innerTemplateArgumentList,
   innerTemplateArgument,
@@ -422,10 +426,10 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
 
             primaryExpression,
 
-            b.sequence(CxxKeyword.DYNAMIC_CAST, "<", typeId, ">", "(", expression, ")"),
-            b.sequence(CxxKeyword.STATIC_CAST, "<", typeId, ">", "(", expression, ")"),
-            b.sequence(CxxKeyword.REINTERPRET_CAST, "<", typeId, ">", "(", expression, ")"),
-            b.sequence(CxxKeyword.CONST_CAST, "<", typeId, ">", "(", expression, ")"),
+            b.sequence(CxxKeyword.DYNAMIC_CAST, typeIdEnclosed, "(", expression, ")"),
+            b.sequence(CxxKeyword.STATIC_CAST, typeIdEnclosed, "(", expression, ")"),
+            b.sequence(CxxKeyword.REINTERPRET_CAST, typeIdEnclosed, "(", expression, ")"),
+            b.sequence(CxxKeyword.CONST_CAST, typeIdEnclosed, "(", expression, ")"),
             b.sequence(CxxKeyword.TYPEID, "(", expression, ")"),
             b.sequence(CxxKeyword.TYPEID, "(", typeId, ")")
         ),
@@ -454,6 +458,10 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
         )
         )
         ).skipIfOneChild();
+
+        b.rule(typeIdEnclosed).is(b.firstOf(
+          b.sequence("<", typeId, ">"),
+          b.sequence("<", innerTypeId, ">>")));
 
     b.rule(expressionList).is(initializerList);
 
@@ -1283,7 +1291,11 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
   }
 
   private static void templates(LexerfulGrammarBuilder b) {
-    b.rule(templateDeclaration).is(CxxKeyword.TEMPLATE, "<", templateParameterList, ">", declaration);
+    b.rule(templateDeclaration).is(CxxKeyword.TEMPLATE, templateParameterListEnclosed, declaration);
+
+    b.rule(templateParameterListEnclosed).is(b.firstOf(
+      b.sequence("<", templateParameterList, ">"),
+      b.sequence("<", b.zeroOrMore(templateParameter, ","), innerTypeParameter, ">>")));
 
     b.rule(templateParameterList).is(templateParameter, b.zeroOrMore(",", templateParameter));
 
@@ -1301,17 +1313,20 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
             b.sequence(CxxKeyword.CLASS, b.optional("..."), b.optional(IDENTIFIER)),
             b.sequence(CxxKeyword.TYPENAME, b.optional(IDENTIFIER), "=", typeId),
             b.sequence(CxxKeyword.TYPENAME, b.optional("..."), b.optional(IDENTIFIER)),
-            b.sequence(CxxKeyword.TEMPLATE, "<", templateParameterList, ">", CxxKeyword.CLASS, b.optional(IDENTIFIER), "=", idExpression),
-            b.sequence(CxxKeyword.TEMPLATE, "<", templateParameterList, ">", CxxKeyword.CLASS, b.optional("..."), b.optional(IDENTIFIER))
+            b.sequence(CxxKeyword.TEMPLATE, templateParameterListEnclosed, CxxKeyword.CLASS, b.optional(IDENTIFIER), "=", idExpression),
+            b.sequence(CxxKeyword.TEMPLATE, templateParameterListEnclosed, CxxKeyword.CLASS, b.optional("..."), b.optional(IDENTIFIER))
         )
         );
 
-    b.rule(simpleTemplateId).is(b.firstOf(
-        b.sequence(templateName, "<", b.optional(templateArgumentList), ">"),
-        b.sequence(templateName, "<", innerTemplateId, ">>")));
+    b.rule(innerTypeParameter).is(
+      b.firstOf(
+          b.sequence(CxxKeyword.CLASS, b.optional(IDENTIFIER), "=", innerTypeId),
+          b.sequence(CxxKeyword.TYPENAME, b.optional(IDENTIFIER), "=", innerTypeId),
+          b.sequence(CxxKeyword.TEMPLATE, templateParameterListEnclosed, CxxKeyword.CLASS, b.optional(IDENTIFIER), "=", innerTypeId)
+      )
+      );
 
-    b.rule(innerTemplateId).is(
-        b.zeroOrMore(templateArgument, b.optional("..."), ","),
+    b.rule(innerTypeId).is(
         b.optional(b.firstOf(
             // typeSpecifierSeq ~> [...] simpleTypeSpecifier
             b.sequence(nestedNameSpecifier, CxxKeyword.TEMPLATE),
@@ -1325,13 +1340,22 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
             )),
             templateName, "<", b.optional(innerTemplateArgumentList));
 
+    b.rule(simpleTemplateId).is(b.firstOf(
+        b.sequence(templateName, "<", b.optional(templateArgumentList), ">"),
+        b.sequence(templateName, "<", innerTemplateId, ">>")));
+
+    b.rule(innerTemplateId).is(
+        b.zeroOrMore(templateArgument, b.optional("..."), ","),
+        innerTypeId
+      );
+
     b.rule(templateId).is(
         b.firstOf(
             simpleTemplateId,
             b.sequence(operatorFunctionId, "<", b.optional(templateArgumentList), ">"),
             b.sequence(literalOperatorId, "<", b.optional(templateArgumentList), ">"),
-            b.sequence(operatorFunctionId, "<", b.optional(templateArgumentList, ","), innerTemplateId, ">>"),
-            b.sequence(literalOperatorId, "<", b.optional(templateArgumentList, ","), innerTemplateId, ">>")
+            b.sequence(operatorFunctionId, "<", innerTemplateId, ">>"),
+            b.sequence(literalOperatorId, "<", innerTemplateId, ">>")
         )
         );
 
