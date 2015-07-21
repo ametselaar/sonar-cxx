@@ -24,19 +24,26 @@ import org.sonar.check.Rule;
 import org.sonar.cxx.parser.CxxParser;
 import org.sonar.cxx.preprocessor.CxxPreprocessor;
 import org.sonar.squidbridge.checks.SquidCheck;
-
 import com.sonar.sslr.api.AstNode;
 import com.sonar.sslr.api.Grammar;
+import org.sonar.squidbridge.annotations.ActivatedByDefault;
+import org.sonar.squidbridge.annotations.NoSqale;
+import org.sonar.squidbridge.annotations.Tags;
 
 @Rule(
-    key = "MissingInclude",
-    priority = Priority.INFO)
+  key = "MissingIncludeFile",
+  name = "C++ preprocessor unable to locate file referenced by #include directive",
+  tags = {Tags.PREPROCESSOR},
+  priority = Priority.INFO)
+@ActivatedByDefault
+@NoSqale
 public class MissingIncludeFileCheck extends SquidCheck<Grammar> {
+
   @Override
   public void leaveFile(AstNode astNode) {
-    for(CxxPreprocessor.Include missingInclude : CxxParser.getMissingIncludeFiles(getContext().getFile())) {
+    for (CxxPreprocessor.Include missingInclude : CxxParser.getMissingIncludeFiles(getContext().getFile())) {
       getContext().createLineViolation(this, "Unable to find the source for '" + missingInclude.getPath() + "'.",
-          missingInclude.getLine());
+        missingInclude.getLine());
     }
   }
 }

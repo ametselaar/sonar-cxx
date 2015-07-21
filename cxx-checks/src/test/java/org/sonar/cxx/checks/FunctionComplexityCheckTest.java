@@ -33,9 +33,12 @@ public class FunctionComplexityCheckTest {
     FunctionComplexityCheck check = new FunctionComplexityCheck();
     check.setMax(5);
 
-    SourceFile file = CxxAstScanner.scanSingleFile(new File("src/test/resources/checks/complexity.cc"), check);
+    SourceFile file = CxxAstScanner.scanSingleFile(new File("src/test/resources/checks/FunctionComplexity.cc"), check);
     CheckMessagesVerifier.verify(file.getCheckMessages())
-        .next().atLine(6).noMore();
+      .next().atLine(13)
+      .next().atLine(33)
+      .next().atLine(51)
+      .next().atLine(72);
   }
 
 }

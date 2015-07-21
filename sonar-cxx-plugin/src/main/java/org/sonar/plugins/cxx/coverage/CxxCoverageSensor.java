@@ -28,87 +28,114 @@ import java.util.Map;
 import javax.xml.stream.XMLStreamException;
 
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.batch.bootstrap.ProjectReactor;
+import org.sonar.api.batch.fs.FileSystem;
 import org.sonar.api.config.Settings;
 import org.sonar.api.measures.CoreMetrics;
 import org.sonar.api.measures.CoverageMeasuresBuilder;
 import org.sonar.api.measures.Measure;
 import org.sonar.api.measures.Metric;
+import org.sonar.api.measures.PropertiesBuilder;
 import org.sonar.api.resources.Project;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
+import org.sonar.plugins.cxx.CxxLanguage;
 import org.sonar.plugins.cxx.utils.CxxReportSensor;
 import org.sonar.plugins.cxx.utils.CxxUtils;
-import org.sonar.api.measures.PropertiesBuilder;
-import org.sonar.api.scan.filesystem.FileQuery;
-import org.sonar.plugins.cxx.CxxLanguage;
-
 /**
  * {@inheritDoc}
  */
 public class CxxCoverageSensor extends CxxReportSensor {
-
-  private static final int UNIT_TEST_COVERAGE = 0;
-  public static final int IT_TEST_COVERAGE = 1;
-  public static final int OVERALL_TEST_COVERAGE = 2;
+  private enum CoverageType {
+    UT_COVERAGE, IT_COVERAGE, OVERALL_COVERAGE
+  }
 
   public static final String REPORT_PATH_KEY = "sonar.cxx.coverage.reportPath";
   public static final String IT_REPORT_PATH_KEY = "sonar.cxx.coverage.itReportPath";
   public static final String OVERALL_REPORT_PATH_KEY = "sonar.cxx.coverage.overallReportPath";
-  private static final String DEFAULT_REPORT_PATH = "coverage-reports/coverage-*.xml";
-  private static final String IT_DEFAULT_REPORT_PATH = "coverage-reports/it-coverage-*.xml";
-  private static final String OVERALL_DEFAULT_REPORT_PATH = "coverage-reports/overall-coverage-*.xml";
-
   public static final String FORCE_ZERO_COVERAGE_KEY = "sonar.cxx.coverage.forceZeroCoverage";
 
   private static List<CoverageParser> parsers = new LinkedList<CoverageParser>();
+    private final ProjectReactor reactor;
 
   /**
    * {@inheritDoc}
    */
-  public CxxCoverageSensor(Settings settings, ModuleFileSystem fs) {
-    super(settings, fs);
+  public CxxCoverageSensor(Settings settings, FileSystem fs, ProjectReactor reactor) {
+    super(settings, fs, reactor);
 
+    this.reactor = reactor;
     parsers.add(new CoberturaParser());
     parsers.add(new BullseyeParser());
     parsers.add(new VisualStudioParser());
   }
 
+  @Override
+  public boolean shouldExecuteOnProject(Project project) {
+    return fs.hasFiles(fs.predicates().hasLanguage(CxxLanguage.KEY))
+      && (isForceZeroCoverageActivated()
+          || conf.hasKey(REPORT_PATH_KEY)
+          || conf.hasKey(IT_REPORT_PATH_KEY)
+          || conf.hasKey(OVERALL_REPORT_PATH_KEY)
+      );
+  }
+  
   /**
    * {@inheritDoc}
    */
   @Override
   public void analyse(Project project, SensorContext context) {
-    String baseDir = fs.baseDir().getPath();
 
-    CxxUtils.LOG.debug("Parsing coverage reports");
-    List<File> reports = getReports(conf, baseDir, REPORT_PATH_KEY, DEFAULT_REPORT_PATH);
-    Map<String, CoverageMeasuresBuilder> coverageMeasures = parseReports(reports);
-    saveMeasures(project, context, coverageMeasures, UNIT_TEST_COVERAGE);
-    if (isForceZeroCoverageActivated()) {
-      CxxUtils.LOG.debug("ForceZeroCoverageActivated=true");
-      zeroMeasuresWithoutReports(project, context, coverageMeasures);
+    Map<String, CoverageMeasuresBuilder> coverageMeasures = null;
+    Map<String, CoverageMeasuresBuilder> itCoverageMeasures = null;
+    Map<String, CoverageMeasuresBuilder> overallCoverageMeasures = null;
+
+    if (conf.hasKey(REPORT_PATH_KEY)) {
+      CxxUtils.LOG.debug("Parsing coverage reports");
+      List<File> reports = getReports(conf,
+        reactor.getRoot().getBaseDir().getAbsolutePath(),
+        fs.baseDir().getPath(),
+        REPORT_PATH_KEY);
+      coverageMeasures = processReports(project, context, reports);
+      saveMeasures(project, context, coverageMeasures, CoverageType.UT_COVERAGE);
     }
 
-    CxxUtils.LOG.debug("Parsing integration test coverage reports");
-    List<File> itReports = getReports(conf, baseDir, IT_REPORT_PATH_KEY, IT_DEFAULT_REPORT_PATH);
-    Map<String, CoverageMeasuresBuilder> itCoverageMeasures = parseReports(itReports);
-    saveMeasures(project, context, itCoverageMeasures, IT_TEST_COVERAGE);
+    if (conf.hasKey(IT_REPORT_PATH_KEY)) {
+      CxxUtils.LOG.debug("Parsing integration test coverage reports");
+      List<File> itReports = getReports(conf,
+        reactor.getRoot().getBaseDir().getAbsolutePath(),
+        fs.baseDir().getPath(),
+        IT_REPORT_PATH_KEY);
+      itCoverageMeasures = processReports(project, context, itReports);
+      saveMeasures(project, context, itCoverageMeasures, CoverageType.IT_COVERAGE);
+    }
 
-    CxxUtils.LOG.debug("Parsing overall test coverage reports");
-    List<File> overallReports = getReports(conf, baseDir, OVERALL_REPORT_PATH_KEY, OVERALL_DEFAULT_REPORT_PATH);
-    Map<String, CoverageMeasuresBuilder> overallCoverageMeasures = parseReports(overallReports);
-    saveMeasures(project, context, overallCoverageMeasures, OVERALL_TEST_COVERAGE);
+    if (conf.hasKey(OVERALL_REPORT_PATH_KEY)) {
+      CxxUtils.LOG.debug("Parsing overall test coverage reports");
+      List<File> overallReports = getReports(conf,
+        reactor.getRoot().getBaseDir().getAbsolutePath(),
+        fs.baseDir().getPath(),
+        OVERALL_REPORT_PATH_KEY);
+      overallCoverageMeasures = processReports(project, context, overallReports);
+      saveMeasures(project, context, overallCoverageMeasures, CoverageType.OVERALL_COVERAGE);
+    }
+
+    if (isForceZeroCoverageActivated()) {
+      CxxUtils.LOG.debug("Zeroing coverage information for untouched files");
+      zeroMeasuresWithoutReports(project, context, coverageMeasures,
+        itCoverageMeasures, overallCoverageMeasures);
+    }
   }
 
-  private Map<String, CoverageMeasuresBuilder> parseReports(List<File> reports) {
+  private Map<String, CoverageMeasuresBuilder> processReports(final Project project, final SensorContext context, List<File> reports) {
     Map<String, CoverageMeasuresBuilder> measuresTotal = new HashMap<String, CoverageMeasuresBuilder>();
     Map<String, CoverageMeasuresBuilder> measuresForReport = new HashMap<String, CoverageMeasuresBuilder>();
 
     for (File report : reports) {
+      CxxUtils.LOG.info("Processing report '{}'", report);
       boolean parsed = false;
       for (CoverageParser parser : parsers) {
         try {
           measuresForReport.clear();
-          parser.parseReport(report, measuresForReport);
+          parser.processReport(project, context, report, measuresForReport);
 
           if (!measuresForReport.isEmpty()) {
             parsed = true;
@@ -132,7 +159,7 @@ public class CxxCoverageSensor extends CxxReportSensor {
   private void saveMeasures(Project project,
     SensorContext context,
     Map<String, CoverageMeasuresBuilder> coverageMeasures,
-    int coveragetype) {
+    CoverageType ctype) {
     for (Map.Entry<String, CoverageMeasuresBuilder> entry : coverageMeasures.entrySet()) {
       String filePath = entry.getKey();
       org.sonar.api.resources.File cxxfile
@@ -140,16 +167,12 @@ public class CxxCoverageSensor extends CxxReportSensor {
       if (fileExist(context, cxxfile)) {
         CxxUtils.LOG.debug("Saving coverage measures for file '{}'", filePath);
         for (Measure measure : entry.getValue().createMeasures()) {
-          switch (coveragetype) {
-            case UNIT_TEST_COVERAGE:
-              break;
-            case IT_TEST_COVERAGE:
+          switch (ctype) {
+            case IT_COVERAGE:
               measure = convertToItMeasure(measure);
               break;
-            case OVERALL_TEST_COVERAGE:
+            case OVERALL_COVERAGE:
               measure = convertForOverall(measure);
-              break;
-            default:
               break;
           }
           context.saveMeasure(cxxfile, measure);
@@ -162,32 +185,68 @@ public class CxxCoverageSensor extends CxxReportSensor {
 
   private void zeroMeasuresWithoutReports(Project project,
     SensorContext context,
-    Map<String, CoverageMeasuresBuilder> coverageMeasures) {
-    for (File file : fs.files(FileQuery.onSource().onLanguage(CxxLanguage.KEY))) {
-      org.sonar.api.resources.File resource = org.sonar.api.resources.File.fromIOFile(file, project);
+    Map<String, CoverageMeasuresBuilder> coverageMeasures,
+    Map<String, CoverageMeasuresBuilder> itCoverageMeasures,
+    Map<String, CoverageMeasuresBuilder> overallCoverageMeasures
+  ) {
+    for (File file : fs.files(fs.predicates().hasLanguage(CxxLanguage.KEY))) {
+      org.sonar.api.resources.File resource = org.sonar.api.resources.File.fromIOFile(file, project); //@todo: fromIOFile is deprecated
       if (fileExist(context, resource)) {
         String filePath = CxxUtils.normalizePath(file.getAbsolutePath());
-        CoverageMeasuresBuilder fileCoverage = coverageMeasures.get(filePath);
-        if (fileCoverage == null) {
-          saveZeroValueForResource(resource, filePath, context);
+
+        if (coverageMeasures == null || coverageMeasures.get(filePath) == null) {
+          saveZeroValueForResource(resource, filePath, context, CoverageType.UT_COVERAGE);
+        }
+
+        if (itCoverageMeasures == null || itCoverageMeasures.get(filePath) == null) {
+          saveZeroValueForResource(resource, filePath, context, CoverageType.IT_COVERAGE);
+        }
+
+        if (overallCoverageMeasures == null || overallCoverageMeasures.get(filePath) == null) {
+          saveZeroValueForResource(resource, filePath, context, CoverageType.OVERALL_COVERAGE);
         }
       }
     }
   }
 
-  private void saveZeroValueForResource(org.sonar.api.resources.File resource, String filePath, SensorContext context) {
-    PropertiesBuilder<Integer, Integer> lineHitsData = new PropertiesBuilder<Integer, Integer>(CoreMetrics.COVERAGE_LINE_HITS_DATA);
+  private void saveZeroValueForResource(org.sonar.api.resources.File resource,
+                                        String filePath,
+                                        SensorContext context,
+                                        CoverageType ctype) {
+
     Measure ncloc = context.getMeasure(resource, CoreMetrics.NCLOC);
     Measure stmts = context.getMeasure(resource, CoreMetrics.STATEMENTS);
     if (ncloc != null && stmts != null
         && ncloc.getValue() > 0 && stmts.getValue() > 0) {
-      CxxUtils.LOG.debug("Zero coverage measures for file '{}'", filePath);
+      String coverageKind = "unit test ";
+      Metric hitsDataMetric = CoreMetrics.COVERAGE_LINE_HITS_DATA;
+      Metric linesToCoverMetric = CoreMetrics.LINES_TO_COVER;
+      Metric uncoveredLinesMetric = CoreMetrics.UNCOVERED_LINES;
+
+      switch(ctype){
+      case IT_COVERAGE:
+        coverageKind = "integration test ";
+        hitsDataMetric = CoreMetrics.IT_COVERAGE_LINE_HITS_DATA;
+        linesToCoverMetric = CoreMetrics.IT_LINES_TO_COVER;
+        uncoveredLinesMetric = CoreMetrics.IT_UNCOVERED_LINES;
+        break;
+      case OVERALL_COVERAGE:
+        coverageKind = "overall ";
+        hitsDataMetric = CoreMetrics.OVERALL_COVERAGE_LINE_HITS_DATA;
+        linesToCoverMetric = CoreMetrics.OVERALL_LINES_TO_COVER;
+        uncoveredLinesMetric = CoreMetrics.OVERALL_UNCOVERED_LINES;
+      default:
+      }
+
+      CxxUtils.LOG.debug("Zeroing {}coverage measures for file '{}'", coverageKind, filePath);
+
+      PropertiesBuilder<Integer, Integer> lineHitsData = new PropertiesBuilder<Integer, Integer>(hitsDataMetric);
       for (int i = 1; i <= context.getMeasure(resource, CoreMetrics.LINES).getIntValue(); ++i) {
         lineHitsData.add(i, 0);
       }
       context.saveMeasure(resource, lineHitsData.build());
-      context.saveMeasure(resource, CoreMetrics.LINES_TO_COVER, ncloc.getValue());
-      context.saveMeasure(resource, CoreMetrics.UNCOVERED_LINES, ncloc.getValue());
+      context.saveMeasure(resource, linesToCoverMetric, ncloc.getValue());
+      context.saveMeasure(resource, uncoveredLinesMetric, ncloc.getValue());
     }
   }
 

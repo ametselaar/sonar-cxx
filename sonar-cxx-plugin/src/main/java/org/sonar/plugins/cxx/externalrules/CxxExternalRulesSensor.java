@@ -26,14 +26,16 @@ import javax.xml.stream.XMLStreamException;
 import org.codehaus.staxmate.in.SMHierarchicCursor;
 import org.codehaus.staxmate.in.SMInputCursor;
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.batch.fs.FileSystem;
 import org.sonar.api.component.ResourcePerspectives;
 import org.sonar.api.config.Settings;
 import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Project;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
 import org.sonar.api.utils.StaxParser;
 import org.sonar.plugins.cxx.utils.CxxMetrics;
 import org.sonar.plugins.cxx.utils.CxxReportSensor;
+import org.sonar.api.batch.bootstrap.ProjectReactor;
+import org.sonar.plugins.cxx.utils.CxxUtils;
 
 /**
  * Custom Rule Import, all static analysis are supported.
@@ -43,14 +45,13 @@ import org.sonar.plugins.cxx.utils.CxxReportSensor;
 public class CxxExternalRulesSensor extends CxxReportSensor {
 
   public static final String REPORT_PATH_KEY = "sonar.cxx.other.reportPath";
-  private static final String DEFAULT_REPORT_PATH = "externalrules-reports/externalrules-result-*.xml";
   private final RulesProfile profile;
 
   /**
    * {@inheritDoc}
    */
-  public CxxExternalRulesSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs, RulesProfile profile) {
-    super(perspectives, conf, fs, CxxMetrics.EXTERNAL);
+  public CxxExternalRulesSensor(ResourcePerspectives perspectives, Settings conf, FileSystem fs, RulesProfile profile, ProjectReactor reactor) {
+    super(perspectives, conf, fs, reactor, CxxMetrics.EXTERNAL);
     this.profile = profile;
   }
 
@@ -69,14 +70,12 @@ public class CxxExternalRulesSensor extends CxxReportSensor {
   }
 
   @Override
-  protected String defaultReportPath() {
-    return DEFAULT_REPORT_PATH;
-  }
-
-  @Override
-  protected void processReport(final Project project, final SensorContext context, File report) throws javax.xml.stream.XMLStreamException {
+  protected void processReport(final Project project, final SensorContext context, File report) throws javax.xml.stream.XMLStreamException
+  {
+    CxxUtils.LOG.info("Parsing 'other' format");
+    
     StaxParser parser = new StaxParser(new StaxParser.XmlStreamHandler() {
-
+ 
       /**
        * {@inheritDoc}
        */

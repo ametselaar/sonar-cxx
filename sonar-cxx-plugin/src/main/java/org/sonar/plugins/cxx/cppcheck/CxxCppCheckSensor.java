@@ -26,11 +26,12 @@ import java.util.List;
 import javax.xml.stream.XMLStreamException;
 
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.batch.fs.FileSystem;
 import org.sonar.api.component.ResourcePerspectives;
+import org.sonar.api.batch.bootstrap.ProjectReactor;
 import org.sonar.api.config.Settings;
 import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Project;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
 import org.sonar.plugins.cxx.utils.CxxMetrics;
 import org.sonar.plugins.cxx.utils.CxxReportSensor;
 import org.sonar.plugins.cxx.utils.CxxUtils;
@@ -43,7 +44,6 @@ import org.sonar.plugins.cxx.utils.CxxUtils;
  */
 public class CxxCppCheckSensor extends CxxReportSensor {
   public static final String REPORT_PATH_KEY = "sonar.cxx.cppcheck.reportPath";
-  private static final String DEFAULT_REPORT_PATH = "cppcheck-reports/cppcheck-result-*.xml";
 
   private final RulesProfile profile;
   private final List<CppcheckParser> parsers = new LinkedList<CppcheckParser>();
@@ -51,9 +51,9 @@ public class CxxCppCheckSensor extends CxxReportSensor {
   /**
    * {@inheritDoc}
    */
-  public CxxCppCheckSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs,
-      RulesProfile profile) {
-    super(perspectives, conf, fs, CxxMetrics.CPPCHECK);
+  public CxxCppCheckSensor(ResourcePerspectives perspectives, Settings conf, FileSystem fs,
+      RulesProfile profile, ProjectReactor reactor) {
+    super(perspectives, conf, fs, reactor, CxxMetrics.CPPCHECK);
     this.profile = profile;
     parsers.add(new CppcheckParserV2(this));
     parsers.add(new CppcheckParserV1(this));
@@ -71,11 +71,6 @@ public class CxxCppCheckSensor extends CxxReportSensor {
   @Override
   protected String reportPathKey() {
     return REPORT_PATH_KEY;
-  }
-
-  @Override
-  protected String defaultReportPath() {
-    return DEFAULT_REPORT_PATH;
   }
 
   @Override

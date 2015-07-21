@@ -218,6 +218,13 @@ Follow these steps to make your custom Custom rules available in SonarQube:
     <description>The identifier preceding a colon was previously declared at the Location given as not being a label.</description>
   </rule>
   <rule>
+    <key>29</key>
+    <configkey>29</configkey>
+    <priority>CRITICAL</priority>
+    <name>L0029: Duplicated type-specifier</name>
+    <description>Multiple type-specifiers were seen in a context expecting only one. A notable exception to this message, of course, is long long.</description>
+  </rule>
+  <rule>
     <key>30</key>
     <configkey>30</configkey>
     <priority>CRITICAL</priority>
@@ -1139,7 +1146,7 @@ Follow these steps to make your custom Custom rules available in SonarQube:
     <key>165</key>
     <configkey>165</configkey>
     <priority>CRITICAL</priority>
-    <name>L0165: An [unscoped] emuration cannot be forward-declared (int is assumed)</name>
+    <name>L0165: An [unscoped] enumeration cannot be forward-declared (int is assumed)</name>
     <description><![CDATA[
 <p>An [unscoped] enumeration cannot be forward-declared [without an enum-base] (int is assumed) -- This message is issued at the point of a forward-declaration of an enumeration like so:</p>
 <pre><tt>
@@ -1200,7 +1207,7 @@ This occurs for a use of the GCC attribute mode() as in:</p>
     <configkey>200</configkey>
     <priority>BLOCKER</priority>
     <name>L0200: Internal Error, subcode=xxxx</name>
-    <description>Internal error occured - subcode is part of message. This inconsistency should be brought to the attention of Gimpel Software</description>
+    <description>Internal error occurred - subcode is part of message. This inconsistency should be brought to the attention of Gimpel Software</description>
   </rule>
   <rule>
     <key>301</key>
@@ -2028,7 +2035,7 @@ For example:</p>
     <configkey>511</configkey>
     <priority>MAJOR</priority>
     <name>L0511: Size incompatibility</name>
-    <description>A cast was made from an integral type to a pointer and the size of the quantity was too large to fit into the pointer. For example if a long is cast to a pointer and if options indicate that a long ise larger than a pointer, this warning would be reported.</description>
+    <description>A cast was made from an integral type to a pointer and the size of the quantity was too large to fit into the pointer. For example if a long is cast to a pointer and if options indicate that a long is larger than a pointer, this warning would be reported.</description>
   </rule>
   <rule>
     <key>512</key>
@@ -2229,7 +2236,7 @@ For example:</p>
     <key>544</key>
     <configkey>544</configkey>
     <priority>MAJOR</priority>
-    <name>L0544: endif or else not followed by EOL</name>
+    <name>L0544: #endif or #else not followed by EOL</name>
     <description>The preprocessor directive #endif should be followed by an end-of-line. Some compilers specifically allow commentary to follow the #endif. If you are following that convention simply turn this error message off.</description>
   </rule>
   <rule>
@@ -2514,7 +2521,7 @@ For example:</p>
     <key>578</key>
     <configkey>578</configkey>
     <priority>MAJOR</priority>
-    <name>L0570: Declaration of symbol 'Symbol' hides symbol 'Symbol' (Location)</name>
+    <name>L0578: Declaration of symbol 'Symbol' hides symbol 'Symbol' (Location)</name>
     <description>A local symbol has the identical name as a global symbol ( or possibly another local symbol). This could be dangerous. Was this deliberate? It is usually best to rename the local symbol.</description>
   </rule>
   <rule>
@@ -2592,14 +2599,14 @@ For example:</p>
     <key>588</key>
     <configkey>588</configkey>
     <priority>MAJOR</priority>
-    <name>L0580: Predicate 'String' will always evaluate to String unless an overflow occurs</name>
+    <name>L0588: Predicate 'String' will always evaluate to String unless an overflow occurs</name>
     <description>The predicate, identified by the first String, cannot possibly be other than what is indicated by the second String parameter unless an overflow occurred. For example: unsigned u; ... if( (u + 2) != 1 ) ... would be greeted with the message that '!=' always evaluates to 'True'. See also Message 587.</description>
   </rule>
   <rule>
     <key>589</key>
     <configkey>589</configkey>
     <priority>MAJOR</priority>
-    <name>L0588: Predicate 'String' will always evaluate to String assuming standard division semantics</name>
+    <name>L0589: Predicate 'String' will always evaluate to String assuming standard division semantics</name>
     <description>The predicate, identified by the first String parameter, cannot possibly be other than what is indicated by the second String parameter assuming standard signed integer division semantics. For example: int n; ... if( n % 2 == 2 ) ... would be greeted with the message that '==' always evaluates to 'False'.
     By standard integer division semantics we mean truncation toward zero so that, for example, -1/4 has quotient 0 and remainder -1 and not quotient -1, remainder 3. Although the current C standard [4] has endorsed this, the current C++ standard [10] regards integer division involving negative numbers to be 'implementation defined'.
     See also Message 587.</description>
@@ -4485,7 +4492,7 @@ The message may also be given for function pointer assignments when the prototyp
     <configkey>847</configkey>
     <priority>MINOR</priority>
     <name>L0847: Thread 'Symbol' has unprotected call to thread unsafe function 'Symbol'</name>
-    <description>A thread named in the message makes an unprotected call (i.e., outside of a critical section) on the function named in the message. The function had previously been identified as thread unsafe. See Section 8. Mult-thread Support for a definition of the terms: unprotected and thread unsafe.
+    <description>A thread named in the message makes an unprotected call (i.e., outside of a critical section) on the function named in the message. The function had previously been identified as thread unsafe. See Section 8. Multi-thread Support for a definition of the terms: unprotected and thread unsafe.
     This is not necessarily an error. Most thread unsafe functions may be called outside of critical sections provided no other thread is making such a call. There are other messages (at the Warning level) that will be issued when some other thread is also calling the same function, so it would normally be safe to suppress this message.</description>
   </rule>
   <rule>
@@ -4541,7 +4548,7 @@ The message may also be given for function pointer assignments when the prototyp
     <priority>MINOR</priority>
     <name>L0867: Unrecognized pragma 'Name' will be ignored</name>
     <description>The first identifier after #pragma is considered the name of the pragma. If the name is unrecognized then the remainder of the line is ignored. Since the purpose of #pragma is to allow for compiler-dependent communication it is not really expected that all pragmas will be understood by all third-party processors of the code. Thus, this message does not necessarily indicate that there is anything wrong and could easily be supressed entirely.
-    Moreover, if the pragma occurs in a libary header this message would not normally be issued because the option -wlib(1) would be in effect (this option is present in all of our compiler option files).
+    Moreover, if the pragma occurs in a library header this message would not normally be issued because the option -wlib(1) would be in effect (this option is present in all of our compiler option files).
     But if the pragma occurs in user code then it should be examined to see if there is something there that might interest a lint processor. There are a variety of facilities to deal with pragmas; in particular, they can be mapped into languistic constructs or lint options or both. See 3.5 pragmas push_macro and pop_macro and 3.6 Casting pragmas as macros.</description>
   </rule>
   <rule>
@@ -4720,7 +4727,7 @@ The message may also be given for function pointer assignments when the prototyp
     <configkey>929</configkey>
     <priority>INFO</priority>
     <name>L0929: Cast from pointer to pointer</name>
-    <description>A cast is being made to convert one pointer to another that does not fall into one of the classifications described in 925 through 928 above. This could be nonportable on machines that distinguish between pointer to char and pointer to word. Consider casting a pointer to pointer to char to a pointer to pointer to word. The indirect bit pattern remains unchanged.</description>
+    <description>A cast is being made to convert one pointer to another that does not fall into one of the classifications described in 925 through 928 above. This could be non-portable on machines that distinguish between pointer to char and pointer to word. Consider casting a pointer to pointer to char to a pointer to pointer to word. The indirect bit pattern remains unchanged.</description>
   </rule>
   <rule>
     <key>930</key>
@@ -4797,7 +4804,7 @@ The message may also be given for function pointer assignments when the prototyp
     <configkey>940</configkey>
     <priority>INFO</priority>
     <name>L0940: omitted braces within an initializer</name>
-    <description>An initializer for a subaggregate does not have braces. For example:
+    <description>An initializer for a sub-aggregate does not have braces. For example:
     int a[2][2] = { 1, 2, 3, 4 };
     This is legal C but may violate local programming standards. The worst violations are covered by Warning 651.</description>
   </rule>
@@ -5305,7 +5312,7 @@ MISRA 2004 checks, use -misra(2)</p>
 <pre><tt>
                =  ()  []  ->
 </tt></pre>
-<p>The parameter String indicates which it is.  [11, Ǳ3.4.3 and Ǳ3.4.6]
+<p>The parameter String indicates which it is.  [11, #3.4.3 and #3.4.6]
 </p>]]></description>
   </rule>
   <rule>
@@ -5345,7 +5352,7 @@ MISRA 2004 checks, use -misra(2)</p>
 <pre><tt>
              void f(int i=0, int j, int k=0);
 </tt></pre>
-<p>is illegal.  [11, Ǹ.2.6]
+<p>is illegal.  [11, #2.6]
 </p>]]></description>
   </rule>
   <rule>
@@ -5458,7 +5465,7 @@ MISRA 2004 checks, use -misra(2)</p>
     <configkey>1043</configkey>
     <priority>CRITICAL</priority>
     <name>L1043: Attempting to 'delete' a non-pointer</name>
-    <description>An expression being delete'd is a non-pointer, non-array. You may only delete that which was created with an invocation of new. [11, ?5.3.4]</description>
+    <description>An expression being deleted is a non-pointer, non-array. You may only delete that which was created with an invocation of new. [11, ?5.3.4]</description>
   </rule>
   <rule>
     <key>1046</key>
@@ -5569,7 +5576,7 @@ MISRA 2004 checks, use -misra(2)</p>
     <key>1061</key>
     <configkey>1061</configkey>
     <priority>CRITICAL</priority>
-    <name>L10601: String member 'Symbol' is not accessible through non-public inheritance</name>
+    <name>L1061: String member 'Symbol' is not accessible through non-public inheritance</name>
     <description>There is an attempt to access a private, protected or public member (the text of the message indicates which kind as well as which member) of a class through a class derived from the original. There is an access violation (see 1060 for the more common access violation) critically dependent on the fact that the inheritance relationship is non-public. [11, ?11.2]</description>
   </rule>
   <rule>
@@ -5588,7 +5595,7 @@ MISRA 2004 checks, use -misra(2)</p>
 <pre><tt>
              X( const X &)
 </tt></pre>
-<p>If you leave off the '&' then a copy constructor would be needed just to copy the argument into the copy constructor.  This is a runaway recursion.  [11, Ǳ2.1]
+<p>If you leave off the '&' then a copy constructor would be needed just to copy the argument into the copy constructor.  This is a runaway recursion.  [11,#2.1]
 </p>]]></description>
   </rule>
   <rule>
@@ -6281,7 +6288,7 @@ Note that the Microsoft compiler implements this extension. For that reason, the
     <key>1112</key>
     <configkey>1112</configkey>
     <priority>CRITICAL</priority>
-    <name>L1111: In a declaration, the form 'auto D(parms)-&gt;type' is the only valid way to use a trailing-return-type</name>
+    <name>L1112: In a declaration, the form 'auto D(parms)-&gt;type' is the only valid way to use a trailing-return-type</name>
     <description><![CDATA[
 <p>In a declaration, the form 'auto D(parms)->type' (where D is either a name or a parenthesized region) is the only valid way to use a trailing-return-type -- For example, if you want to declare that f returns a pointer-to-int, you must write:</p>
 <pre><tt>
@@ -6586,7 +6593,7 @@ Note that the Microsoft compiler implements this extension. For that reason, the
 <pre><tt>
             class A : private B { int a; };
 </tt></pre>
-<p>is preferred if that's what you want.  [11, Ǳ1.1]
+<p>is preferred if that's what you want.  [11,#1.1]
 </p>]]></description>
   </rule>
   <rule>
@@ -6697,7 +6704,7 @@ Note that the Microsoft compiler implements this extension. For that reason, the
     <key>1526</key>
     <configkey>1526</configkey>
     <priority>MAJOR</priority>
-    <name>L1525: Member function 'Symbol' (Location) not defined</name>
+    <name>L1526: Member function 'Symbol' (Location) not defined</name>
     <description>A member function (named in the message) of a non-library class was not defined. This message is suppressed for unit checkout (-u option).</description>
   </rule>
   <rule>
@@ -6840,7 +6847,7 @@ Note, if a const function returns the address of a data member then a 605 (capab
     <key>1540</key>
     <configkey>1540</configkey>
     <priority>MAJOR</priority>
-    <name>L1540: pointer member 'Symbol' (Location) neither freed nor zero'ed by destructor</name>
+    <name>L1540: pointer member 'Symbol' (Location) neither freed nor zeroed by destructor</name>
     <description>The indicated member is a non-static pointer member of a class that was apparently not freed by the class' destructor. Was this an oversight? By freeing, we mean either a call to the free() function or use of the delete operator. If the pointer is only intended to point to static information during its lifetime then, of course, it never should be freed. In that case you should signal closure by assigning it the NULL pointer (0).</description>
   </rule>
   <rule>
@@ -7281,7 +7288,7 @@ Some designers adopt the strategy of embedding the class within a sub namespace 
     <key>1576</key>
     <configkey>1576</configkey>
     <priority>MAJOR</priority>
-    <name>L1576: Explicit specialialization does not occur in the same file as corresponding function template 'Symbol' (Location)</name>
+    <name>L1576: Explicit specialization does not occur in the same file as corresponding function template 'Symbol' (Location)</name>
     <description>An explicit specialization of a function template was found to be declared in a file other than the one in which the corresponding function template is declared. Two identical calls in two different modules on the same function template could then have two differing interpretations based on the inclusion of header files. The result is undefined behavior.
     As if this wasn't enough, if the explicit specialization could match two separate function templates then the result you obtain could depend on which function templates are in scope.
     See also the next message.</description>
@@ -7290,7 +7297,7 @@ Some designers adopt the strategy of embedding the class within a sub namespace 
     <key>1577</key>
     <configkey>1577</configkey>
     <priority>MAJOR</priority>
-    <name>L1577: Partial or explicit specialialization does not occur in the same file as primary template 'Symbol' (Location)</name>
+    <name>L1577: Partial or explicit specialization does not occur in the same file as primary template 'Symbol' (Location)</name>
     <description>There is a danger in declaring an explicit specialization or a partial specialization in a file other than that which holds the primary class template. The reason is that a given implicit specialization will differ depending on what headers it sees. It can easily differ from module to module and undefined behavior can be the result.
     See also Warning 1576 which diagnoses a similar problem with function templates.</description>
   </rule>
@@ -7629,7 +7636,7 @@ Some designers adopt the strategy of embedding the class within a sub namespace 
     <key>1740</key>
     <configkey>1740</configkey>
     <priority>MINOR</priority>
-    <name>L1740: pointer member 'Symbol' (Location) not directly freed or zero'ed by destructor</name>
+    <name>L1740: pointer member 'Symbol' (Location) not directly freed or zeroed by destructor</name>
     <description>A destructor did not free or zero a pointer member. However, it did call out to another (non-const) member function which may have done the required work. This Informational message is a companion to Warning 1540 which covers the situation where no member function is called from within the destructor.</description>
   </rule>
   <rule>
@@ -7888,14 +7895,14 @@ Some designers adopt the strategy of embedding the class within a sub namespace 
     <description>A string literal, according to Standard C++ is typed an array of const char. This message is issued when such a literal is assigned to a non-const pointer. For example:
     char *p = "string";
     will trigger this message. This pointer could then be used to modify the string literal and that could produce some very strange behavior.
-    Such an assignent is legal but "deprecated" by the C++ Standard. The reason for not ruling it illegal is that numerous existing functions have their arguments typed as char * and this would break working code.
+    Such an assignment is legal but "deprecated" by the C++ Standard. The reason for not ruling it illegal is that numerous existing functions have their arguments typed as char * and this would break working code.
     Note that this message is only given for string literals. If an expression is typed as pointer to const char in some way other than via string literal, then an assignment of that pointer to a non-const pointer will receive a more severe warning.</description>
   </rule>
   <rule>
     <key>1777</key>
     <configkey>1777</configkey>
     <priority>MINOR</priority>
-    <name>L1770: Template recursion limit (Integer) reached, use -tr_limit(n)</name>
+    <name>L1777: Template recursion limit (Integer) reached, use -tr_limit(n)</name>
     <description>It is possible to write a recursive template that will contain a recursive invocation without an escape clause. For example:
     template &lt;class T&gt; class A { A&lt; A &gt; x; }; A&lt;int&gt; a; This will result in attempts to instantiate: A&lt;int&gt; A&lt;A&lt;int&gt;&gt; A&lt;A&lt;A&lt;int&gt;&gt;&gt; ... Using the -vt option (turning on template verbosity) you will see the sequence in action. Accordingly we have devised a scheme to break the recursion when an arbitrary depth of recursion has been reached (at this writing 75). This depth is reported in the message. As the message suggests, this limit can be adjusted so that it equals some other value.
     When the limit is reached, a complete type is not used in the definition of the last specialization in the sequence but processing goes on. The message can be suppressed in most cases with no ill effects.</description>
@@ -9077,6 +9084,14 @@ Some designers adopt the strategy of embedding the class within a sub namespace 
     <name>L9091: casting from pointer type to integer type</name>
     <description>A cast of a pointer to an integer type was seen. Since the size of the integer required when a pointer is converted to an integer is implementation defined, some coding guidelines advise against such casts.</description>
   </rule>
+  
+  <rule>
+    <key>9092</key>
+    <configkey>9092</configkey>
+    <priority>INFO</priority>
+    <name>L9092: casting between a pointer to void and an integral type</name>
+    <description>A cast of a pointer to void and an integral type was seen, some coding guidelines advise against such casts.</description>
+  </rule>
 
   <rule>
     <key>9102</key>
@@ -9460,6 +9475,14 @@ Some designers adopt the strategy of embedding the class within a sub namespace 
     <priority>INFO</priority>
     <name>L9151: public copy assignment operator in abstract class</name>
     <description>A public copy assignment operator was declared in an abstract class.</description>
+  </rule>
+
+  <rule>
+    <key>9152</key>
+    <configkey>9152</configkey>
+    <priority>INFO</priority>
+    <name>L9152: explicit specialization of overloaded function templates 'String' and 'String'</name>
+    <description>An explicit specialization of one of the named function templates was seen. Since explicit specializations are considered only after overload resolution chooses a best match from a set of primary function templates, at least one set of coding guidelines suggests avoiding such specialization to reduce the risk of developer confusion.</description>
   </rule>
 
   <rule>
@@ -9903,9 +9926,9 @@ Some designers adopt the strategy of embedding the class within a sub namespace 
     <key>M10.6</key>
     <configkey>M10.6</configkey>
     <priority>INFO</priority>
-    <name>M10.6: unsigned integer literals require a „U‟ suffix (MISRA C)</name>
+    <name>M10.6: unsigned integer literals require a 'U' suffix (MISRA C)</name>
     <description>
-    unsigned integer literals require a „U‟ suffix</description>
+    unsigned integer literals require a 'U' suffix</description>
   </rule>
   <rule>
     <key>M11.1</key>
@@ -10976,7 +10999,7 @@ the equality operators == and !=, and the unary &amp; operator.</description>
     <key>M5-0-2</key>
     <configkey>M5-0-2</configkey>
     <priority>INFO</priority>
-    <name>M5-0-2: Dependence placed on C’s operator precedence (MISRA C++)</name>
+    <name>M5-0-2: Dependence placed on C's operator precedence (MISRA C++)</name>
     <description>(Advisory) Limited dependence should be placed on C++ operator precedence rules in expressions.</description>
   </rule>
   <rule>
@@ -11175,14 +11198,14 @@ immediately cast to the underlying type of the operand.</description>
     <configkey>M5-2-10</configkey>
     <priority>INFO</priority>
     <name>M5-2-10: Increment or decrement combined with another operator (MISRA C++)</name>
-    <description>(Advisory) The increment (++) and decrement (–) operators should not be mixed with other operators in an expression.</description>
+    <description>(Advisory) The increment (++) and decrement (--) operators should not be mixed with other operators in an expression.</description>
   </rule>
   <rule>
     <key>M5-2-11</key>
     <configkey>M5-2-11</configkey>
     <priority>INFO</priority>
-    <name>M5-2-11: overloading special operators – comma &amp;&amp; || (MISRA C++)</name>
-    <description>(Required) The comma operator, &amp;&amp; operator and the || operator shall not be overloaded.</description>
+    <name>M5-2-11: overloading special operators – ',' '&amp;&amp;' '||' (MISRA C++)</name>
+    <description>(Required) The comma operator, '&amp;&amp;' operator and the '||' operator shall not be overloaded.</description>
   </rule>
   <rule>
     <key>M5-2-12</key>
@@ -11331,7 +11354,7 @@ immediately cast to the underlying type of the operand.</description>
   MISRA C++ rule 6-5-1 req no not currently supported
     (Required) A for loop shall contain a single loop-counter which shall not have floating type.
   MISRA C++ rule 6-5-2 req no not currently supported
-    (Required) If loop-counter is not modified by – or ++, then, within condition, the loop-counter shall only be used as an operand to <=, <, > or >=.
+    (Required) If loop-counter is not modified by -– or ++, then, within condition, the loop-counter shall only be used as an operand to <=, <, > or >=.
   -->
   <rule>
     <key>M6-5-3</key>
@@ -11342,7 +11365,7 @@ immediately cast to the underlying type of the operand.</description>
   </rule>
   <!--
   MISRA C++ rule 6-5-4 req no not currently supported
-    (Required) The loop-counter shall be modified by one of: –, ++, -=n, or +=n; where n remains constant for the duration of the loop.
+    (Required) The loop-counter shall be modified by one of: -–, ++, -=n, or +=n; where n remains constant for the duration of the loop.
   MISRA C++ rule 6-5-5 req no not currently supported
     (Required) A loop-control-variable other than the loop-counter shall not be modified within condition or expression.
   MISRA C++ rule 6-5-6 req no not currently supported
@@ -11641,7 +11664,7 @@ immediately cast to the underlying type of the operand.</description>
     <configkey>M12-1-1</configkey>
     <priority>INFO</priority>
     <name>M12-1-1: Call to virtual function within a constructor or destructor (MISRA C++)</name>
-    <description>(Required) An object’s dynamic type shall not be used from the body of its constructor or destructor.</description>
+    <description>(Required) An object's dynamic type shall not be used from the body of its constructor or destructor.</description>
   </rule>
   <rule>
     <key>M12-1-2</key>
@@ -11825,7 +11848,7 @@ immediately cast to the underlying type of the operand.</description>
     <configkey>M15-5-2</configkey>
     <priority>INFO</priority>
     <name>M15-5-2: Exception not in throw-list of function (MISRA C++)</name>
-    <description>(Required) Where a function’s declaration includes an exception specification, the function shall only be capable of throwing exceptions of the indicated type(s).</description>
+    <description>(Required) Where a function's declaration includes an exception specification, the function shall only be capable of throwing exceptions of the indicated type(s).</description>
   </rule>
   <rule>
     <key>M15-5-3</key>
@@ -11846,7 +11869,7 @@ immediately cast to the underlying type of the operand.</description>
     <configkey>M16-0-2</configkey>
     <priority>INFO</priority>
     <name>M16-0-2: '#define/#undef' used within a block (MISRA C++)</name>
-    <description>(Required) Macros shall only be #define’d or #undef’d in the global namespace.</description>
+    <description>(Required) Macros shall only be #define'd or #undef'd in the global namespace.</description>
   </rule>
   <rule>
     <key>M16-0-3</key>
@@ -11927,7 +11950,7 @@ immediately cast to the underlying type of the operand.</description>
     <configkey>M16-2-4</configkey>
     <priority>INFO</priority>
     <name>M16-2-4: Header file name with non-standard character (MISRA C++)</name>
-    <description>(Required) The ’, ", /* or // characters shall not occur in a header file name.</description>
+    <description>(Required) The ', ", /* or // characters shall not occur in a header file name.</description>
   </rule>
   <rule>
     <key>M16-2-5</key>

@@ -48,7 +48,7 @@ public class CppcheckParserV1 implements CppcheckParser {
    */
   public void processReport(final Project project, final SensorContext context, File report)
     throws javax.xml.stream.XMLStreamException {
-    CxxUtils.LOG.info("cppcheck V1 - Parsing report '{}'", report);
+    CxxUtils.LOG.info("Parsing 'Cppckeck V1' format");
 
     StaxParser parser = new StaxParser(new StaxParser.XmlStreamHandler() {
       /**
@@ -69,6 +69,11 @@ public class CppcheckParserV1 implements CppcheckParser {
             String line = errorCursor.getAttrValue("line");
             String id = errorCursor.getAttrValue("id");
             String msg = errorCursor.getAttrValue("msg");
+
+            if ("*".equals(file)) { // findings on project level
+              file = null;
+              line = null;
+            }
 
             if (isInputValid(file, line, id, msg)) {
               sensor.saveUniqueViolation(project, context, CxxCppCheckRuleRepository.KEY, file, line, id, msg);

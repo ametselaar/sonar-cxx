@@ -30,33 +30,34 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.batch.fs.FileSystem;
 import org.sonar.api.config.Settings;
 import org.sonar.api.measures.CoreMetrics;
 import org.sonar.api.resources.Project;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
 import org.sonar.plugins.cxx.TestUtils;
+import org.sonar.api.batch.bootstrap.ProjectReactor;
 
 public class CxxXunitSensorTest {
   private CxxXunitSensor sensor;
   private SensorContext context;
   private Project project;
-  private ModuleFileSystem fs;
+  private FileSystem fs;
   private Settings config;
+  private ProjectReactor reactor;
 
   @Before
   public void setUp() {
     project = TestUtils.mockProject();
     fs = TestUtils.mockFileSystem();
     config = new Settings();
+    reactor = TestUtils.mockReactor();
     context = mock(SensorContext.class);
-
-    sensor = new CxxXunitSensor(config, fs);
+    sensor = new CxxXunitSensor(config, fs, reactor);
   }
 
   @Test
@@ -64,18 +65,11 @@ public class CxxXunitSensorTest {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.REPORT_PATH_KEY, "xunit-report.xml");
 
-    List<File> sourceDirs = new ArrayList<File>();
     File baseDir = TestUtils.loadResource("/org/sonar/plugins/cxx/finding-sources-project");
-    sourceDirs.add(baseDir);
+    fs = TestUtils.mockFileSystem(baseDir, Arrays.asList(new File("src")),
+                                  Arrays.asList(new File("tests1"), new File("tests2")));
 
-    List<File> testDirs = new ArrayList<File>();
-    testDirs.add(new File(baseDir, "tests1"));
-    testDirs.add(new File(baseDir, "tests2"));
-
-    Project project = TestUtils.mockProject(baseDir, sourceDirs, testDirs);
-    fs = TestUtils.mockFileSystem(baseDir, sourceDirs, testDirs);
-
-    sensor = new CxxXunitSensor(config, fs);
+    sensor = new CxxXunitSensor(config, fs, reactor);
     sensor.buildLookupTables();
 
     // case 1:
@@ -93,14 +87,14 @@ public class CxxXunitSensorTest {
     // case 3:
     // the testcase file resides: in second directory
     // the testcase file contains: the class in a namespace
-    // the report mentions: the class name
+    // the report mentions: the class name only
     assertEquals(sensor.lookupFilePath("TestClass3"), new File(baseDir, "tests2/Test3.cc").getPath());
-
+    
     // case 4:
     // the testcase file resides: somewhere
     // the testcase file contains: the class is implemented via a header and impl. file
     // the report mentions: the class name
-    assertEquals(new File(baseDir, "tests2/Test4.cc").getPath(), sensor.lookupFilePath("TestClass4"));
+    assertEquals(sensor.lookupFilePath("TestClass4"), new File(baseDir, "tests2/Test4.cc").getPath());
 
     // case 5:
     // the testcase file resides: somewhere
@@ -119,27 +113,33 @@ public class CxxXunitSensorTest {
     //                             a header (definition) and two *.cc files
     // the report mentions: the class name
     assertThat(sensor.lookupFilePath("TestClass6"),
-               anyOf(is(new File(baseDir, "tests1/Test6_A.cc").getPath()),
+               anyOf(is(new File(baseDir, "tests1/Test6.hh").getPath()),
+                     is(new File(baseDir, "tests1/Test6_A.cc").getPath()),
                      is(new File(baseDir, "tests1/Test6_B.cc").getPath())));
+    
+    // case 7:
+    // the boost test framework way
+    // the testcase file contains: testuite is a namespace, testcase a struct
+    // the report mentions: the class name is a qualified name
+    assertEquals(sensor.lookupFilePath("my_test_suite::my_test"), new File(baseDir, "tests1/Test7.cc").getPath());    
   }
 
   @Test
   public void shouldReportNothingWhenNoReportFound() {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.REPORT_PATH_KEY, "notexistingpath");
-
-    sensor = new CxxXunitSensor(config, TestUtils.mockFileSystem());
+    sensor = new CxxXunitSensor(config, fs, TestUtils.mockReactor());
 
     sensor.analyse(project, context);
 
     verify(context, times(0)).saveMeasure(eq(CoreMetrics.TESTS), any(Double.class));
   }
 
-  @Test(expected = org.sonar.api.utils.SonarException.class)
+  @Test(expected = org.sonar.api.utils.SonarException.class) //@todo SonarException has been deprecated, see http://javadocs.sonarsource.org/4.5.2/apidocs/deprecated-list.html
   public void shouldThrowWhenGivenInvalidTime() {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.REPORT_PATH_KEY, "xunit-reports/invalid-time-xunit-report.xml");
-    sensor = new CxxXunitSensor(config, fs);
+    sensor = new CxxXunitSensor(config, fs, reactor);
 
     sensor.analyse(project, context);
   }
@@ -151,7 +151,7 @@ public class CxxXunitSensorTest {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.XSLT_URL_KEY, "whatever");
 
-    sensor = new CxxXunitSensor(config, fs);
+    sensor = new CxxXunitSensor(config, fs, reactor);
 
     sensor.transformReport(cppunitReport());
   }
@@ -163,7 +163,7 @@ public class CxxXunitSensorTest {
     Settings config = new Settings();
     config.setProperty(CxxXunitSensor.XSLT_URL_KEY, "cppunit-1.x-to-junit-1.0.xsl");
 
-    sensor = new CxxXunitSensor(config, fs);
+    sensor = new CxxXunitSensor(config, fs, reactor);
     File reportBefore = cppunitReport();
 
     File reportAfter = sensor.transformReport(reportBefore);

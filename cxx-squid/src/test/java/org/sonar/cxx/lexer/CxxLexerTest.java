@@ -210,6 +210,51 @@ public class CxxLexerTest {
    * C++ Standard, Section 2.14.2 "Integer literals"
    */
   @Test
+  public void bin_integer_literals() {
+    // Hex integer
+    assertThat(lexer.lex("0b1"), hasToken("0b1", CxxTokenType.NUMBER));
+
+    // With "UnsignedSuffix"
+    assertThat(lexer.lex("0b1u"), hasToken("0b1u", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1U"), hasToken("0b1U", CxxTokenType.NUMBER));
+
+    // With "UnsignedSuffix LongSuffix"
+    assertThat(lexer.lex("0b1ul"), hasToken("0b1ul", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1uL"), hasToken("0b1uL", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1Ul"), hasToken("0b1Ul", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1UL"), hasToken("0b1UL", CxxTokenType.NUMBER));
+
+    // With "UnsignedSuffix LongLongSuffix"
+    assertThat(lexer.lex("0b1ull"), hasToken("0b1ull", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1uLL"), hasToken("0b1uLL", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1Ull"), hasToken("0b1Ull", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1ULL"), hasToken("0b1ULL", CxxTokenType.NUMBER));
+
+    // With "LongSuffix"
+    assertThat(lexer.lex("0b1l"), hasToken("0b1l", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1L"), hasToken("0b1L", CxxTokenType.NUMBER));
+
+    // With "LongSuffix UnsignedSuffix"
+    assertThat(lexer.lex("0b1lu"), hasToken("0b1lu", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1lU"), hasToken("0b1lU", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1Lu"), hasToken("0b1Lu", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1LU"), hasToken("0b1LU", CxxTokenType.NUMBER));
+
+    // With "LongLongSuffix"
+    assertThat(lexer.lex("0b1ll"), hasToken("0b1ll", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1LL"), hasToken("0b1LL", CxxTokenType.NUMBER));
+
+    // With "LongLongSuffix UnsignedSuffix"
+    assertThat(lexer.lex("0b1llu"), hasToken("0b1llu", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1llU"), hasToken("0b1llU", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1LLu"), hasToken("0b1LLu", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0b1LLU"), hasToken("0b1LLU", CxxTokenType.NUMBER));
+  }
+
+  /**
+   * C++ Standard, Section 2.14.2 "Integer literals"
+   */
+  @Test
   public void hex_integer_literals_bigX() {
     // Hex integer (big X)
     assertThat(lexer.lex("0X7"), hasToken("0X7", CxxTokenType.NUMBER));
@@ -251,6 +296,51 @@ public class CxxLexerTest {
     assertThat(lexer.lex("0X7LLU"), hasToken("0X7LLU", CxxTokenType.NUMBER));
   }
 
+ /**
+   * C++ Standard, Section 2.14.2 "Integer literals"
+   */
+  @Test
+  public void bin_integer_literals_bigX() {
+    // Hex integer (big X)
+    assertThat(lexer.lex("0B1"), hasToken("0B1", CxxTokenType.NUMBER));
+
+    // With "UnsignedSuffix"
+    assertThat(lexer.lex("0B1u"), hasToken("0B1u", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1U"), hasToken("0B1U", CxxTokenType.NUMBER));
+
+    // With "UnsignedSuffix LongSuffix"
+    assertThat(lexer.lex("0B1ul"), hasToken("0B1ul", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1uL"), hasToken("0B1uL", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1Ul"), hasToken("0B1Ul", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1UL"), hasToken("0B1UL", CxxTokenType.NUMBER));
+
+    // With "UnsignedSuffix LongLongSuffix"
+    assertThat(lexer.lex("0B1ull"), hasToken("0B1ull", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1uLL"), hasToken("0B1uLL", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1Ull"), hasToken("0B1Ull", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1ULL"), hasToken("0B1ULL", CxxTokenType.NUMBER));
+
+    // With "LongSuffix"
+    assertThat(lexer.lex("0B1l"), hasToken("0B1l", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1L"), hasToken("0B1L", CxxTokenType.NUMBER));
+
+    // With "LongSuffix UnsignedSuffix"
+    assertThat(lexer.lex("0B1lu"), hasToken("0B1lu", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1lU"), hasToken("0B1lU", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1Lu"), hasToken("0B1Lu", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1LU"), hasToken("0B1LU", CxxTokenType.NUMBER));
+
+    // With "LongLongSuffix"
+    assertThat(lexer.lex("0B1ll"), hasToken("0B1ll", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1LL"), hasToken("0B1LL", CxxTokenType.NUMBER));
+
+    // With "LongLongSuffix UnsignedSuffix"
+    assertThat(lexer.lex("0B1llu"), hasToken("0B1llu", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1llU"), hasToken("0B1llU", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1LLu"), hasToken("0B1LLu", CxxTokenType.NUMBER));
+    assertThat(lexer.lex("0B1LLU"), hasToken("0B1LLU", CxxTokenType.NUMBER));
+  }
+  
   /**
    * C++ Standard, Section 2.14.4 "Floating literals"
    */
@@ -356,11 +446,11 @@ public class CxxLexerTest {
 
   @Test
   public void rawstring_literals() {
-    assertThat("raw string: empty", lexer.lex("R\"\""), hasToken("R\"\"", CxxTokenType.STRING));
-    assertThat("raw string: prefix u", lexer.lex("uR\"\""), hasToken("uR\"\"", CxxTokenType.STRING));
-    assertThat("raw string: prefix u8R", lexer.lex("u8R\"\""), hasToken("u8R\"\"", CxxTokenType.STRING));
-    assertThat("raw string: prefix UR", lexer.lex("UR\"\""), hasToken("UR\"\"", CxxTokenType.STRING));
-    assertThat("raw string: prefix LR", lexer.lex("LR\"\""), hasToken("LR\"\"", CxxTokenType.STRING));
+    assertThat("raw string: empty", lexer.lex("R\"(...)\""), hasToken("R\"(...)\"", CxxTokenType.STRING));
+    assertThat("raw string: prefix u", lexer.lex("uR\"(...)\""), hasToken("uR\"(...)\"", CxxTokenType.STRING));
+    assertThat("raw string: prefix u8R", lexer.lex("u8R\"(...)\""), hasToken("u8R\"(...)\"", CxxTokenType.STRING));
+    assertThat("raw string: prefix UR", lexer.lex("UR\"(...)\""), hasToken("UR\"(...)\"", CxxTokenType.STRING));
+    assertThat("raw string: prefix LR", lexer.lex("LR\"(...)\""), hasToken("LR\"(...)\"", CxxTokenType.STRING));
 
     // examples from the standard
     assertThat("raw string: std example 1", lexer.lex("R\"(...)\""), hasToken("R\"(...)\"", CxxTokenType.STRING));
@@ -368,6 +458,19 @@ public class CxxLexerTest {
     assertThat("raw string: std example 3", lexer.lex("uR\"*∼(...)*∼\""), hasToken("uR\"*∼(...)*∼\"", CxxTokenType.STRING));
     assertThat("raw string: std example 4", lexer.lex("UR\"zzz(...)zzz\""), hasToken("UR\"zzz(...)zzz\"", CxxTokenType.STRING));
     assertThat("raw string: std example 5", lexer.lex("LR\"(...)\""), hasToken("LR\"(...)\"", CxxTokenType.STRING));
+
+    assertThat("raw string: an unescaped \\ character",
+      lexer.lex("R\"(An unescaped \\ character)\""), hasToken("R\"(An unescaped \\ character)\"", CxxTokenType.STRING));
+
+    assertThat("raw string: an unescaped \" character",
+      lexer.lex("R\"(An unescaped \" character)\""), hasToken("R\"(An unescaped \" character)\"", CxxTokenType.STRING));
+
+    assertThat("raw string: represent the string: )\"",
+      lexer.lex("R\"xyz()\")xyz\""), hasToken("R\"xyz()\")xyz\"", CxxTokenType.STRING));
+
+    assertThat("raw string: complex example",
+      lexer.lex("R\"X*X(A C++11 raw string literal can be specified like this: R\"(This is my raw string)\" )X*X\""),
+      hasToken("R\"X*X(A C++11 raw string literal can be specified like this: R\"(This is my raw string)\" )X*X\"", CxxTokenType.STRING));
   }
 
   @Test

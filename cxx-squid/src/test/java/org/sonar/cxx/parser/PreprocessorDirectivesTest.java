@@ -143,24 +143,24 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
             + "lang_init(c)();"))
         .equals("c = c_init ( ) ; EOF"));
 
-
-    // This one doesnt work.
-    // The preprocessor seems to resule resolves macro in the wrong order:
-    // BOOST_MSVC => _MSC_VER => 1600 ## _WORKAROUND_GUARD => 1600 _WORKAROUND_GUARD
-    //
-    // instead of
-    //
-    // BOOST_MSVC =>  _MSC_VER
-    // _MSC_VER ## _WORKAROUND_GUARD => _MSC_VER_WORKAROUND_GUARD
-    // _MSC_VER_WORKAROUND_GUARD => 0
-
-    // assert (serialize(p.parse(
-    //   "#define _MSC_VER_WORKAROUND_GUARD 0\n"
-    //   + "#define _MSC_VER 1600\n"
-    //   + "#define BOOST_MSVC _MSC_VER\n"
-    //   + "#define TEST(symbol) symbol ## _WORKAROUND_GUARD\n"
-    //   + "TEST(BOOST_MSVC);"))
-    //   .equals("0 ; EOF"));
+    assert (serialize(p.parse(
+      "#define _MSC_VER_WORKAROUND_GUARD 1\n"
+      + "#define BOOST_MSVC_WORKAROUND_GUARD 0\n"
+      + "#define _MSC_VER 1600\n"
+      + "#define BOOST_MSVC _MSC_VER\n"
+      + "#define TEST(symbol) symbol ## _WORKAROUND_GUARD\n"
+      + "int i=TEST(BOOST_MSVC);"))
+      .equals("int i = 0 ; EOF"));
+    
+    assert (serialize(p.parse(
+      "#define _MSC_VER_WORKAROUND_GUARD 1\n"
+      + "#define BOOST_MSVC_WORKAROUND_GUARD 0\n"
+      + "#define _MSC_VER 1600\n"
+      + "#define BOOST_MSVC _MSC_VER\n"
+      + "#define _WORKAROUND_GUARD _XXX\n"
+      + "#define TEST(symbol1, symbol2) symbol1 ## symbol2\n"
+      + "int i=TEST(BOOST_MSVC, _WORKAROUND_GUARD);"))
+      .equals("int i = 0 ; EOF"));
   }
 
   @Test
@@ -220,24 +220,69 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
 
   @Test
   public void stringification() {
+    // default use case
     assert (serialize(p.parse(
-      "#define str(s) #s\n"
-      + "string s = str(t);"))
-      .equals("string s = \"t\" ; EOF"));
+      "#define make_string(x) #x\n"
+      + "string s = make_string(a test);"))
+      .equals("string s = \"a test\" ; EOF"));
+
+    // leading and trailing spaces were trimmed,
+    // space between words was compressed to a single space character
+    assert (serialize(p.parse(
+      "#define make_string(x) #x\n"
+      + "string s = make_string(   a    test   );"))
+      .equals("string s = \"a test\" ; EOF"));
+
+    // the quotes were automatically converted
+    assert (serialize(p.parse(
+      "#define make_string(x) #x\n"
+      + "string s = make_string(\"a\" \"test\");"))
+      .equals("string s = \"\\\"a\\\" \\\"test\\\"\" ; EOF"));
+
+    // the slash were automatically converted
+    assert (serialize(p.parse(
+      "#define make_string(x) #x\n"
+      + "string s = make_string(a\\test);"))
+      .equals("string s = \"a\\\\test\" ; EOF"));
+
+    // If the token is a macro, the macro is not expanded
+    // - the macro name is converted into a string.
+    assert (serialize(p.parse(
+      "#define make_string(x) #x\n"
+      + "#define COMMA ,\n"
+      + "string s = make_string(a COMMA test);"))
+      .equals("string s = \"a COMMA test\" ; EOF"));
+      
+    assert (serialize(p.parse(
+      "#define F abc\n"
+      + "#define B def\n"
+      + "#define FB(arg) #arg\n"
+      + "string s = FB(F B);"))
+      .equals("string s = \"F B\" ; EOF"));
+    
+    assert (serialize(p.parse(
+      "#define F abc\n"
+      + "#define B def\n"
+      + "#define FB(arg) #arg\n"
+      + "#define FB1(arg) FB(arg)\n"
+      + "string s = FB1(F B);"))
+      .equals("string s = \"abc def\" ; EOF"));
+    
+    assert (serialize(p.parse(
+      "#define F abc\n"
+      + "#define B def\n"
+      + "#define FB(arg) #arg\n"
+      + "#define FB1(arg) FB(arg)\n"
+      + "string s = FB1(F\\B);"))
+      .equals("string s = \"abc\\\\def\" ; EOF"));
 
     assert (serialize(p.parse(
-      "#define xstr(s) str(s)\n"
-      + "#define str(s) #s\n"
-      + "#define foo 4\n"
-      + "string s = str(foo);"))
-      .equals("string s = \"foo\" ; EOF"));
-
-    assert (serialize(p.parse(
-              "#define xstr(s) str(s)\n"
-              + "#define str(s) #s\n"
-              + "#define foo 4\n"
-              + "string s = xstr(foo);"))
-              .equals("string s = \"4\" ; EOF")); // tested with gcc
+      "#define F abc\n"
+      + "#define B def\n"
+      + "#define FB(arg) #arg\n"
+      + "#define FB1(arg) FB(arg)\n"
+      + "string s = FB1(F/B);"))
+      .equals("string s = \"abc/def\" ; EOF"));
   }
 
   @Test

@@ -47,6 +47,7 @@ import com.sonar.sslr.impl.ast.AstXmlPrinter;
  * <li>enumerations</li>
  * <li>enumeration values</li>
  * <li>typedefs</li>
+ * <li>alias declaration (<code>using MyAlias = int;</code>)</li>
  * <li>functions</li>
  * <li>variables</li>
  * </ul>
@@ -84,7 +85,8 @@ public abstract class AbstractCxxPublicApiVisitor<GRAMMAR extends Grammar>
      */
     private static final boolean DUMP = false;
 
-    private static final String UNNAMED_CLASSIFIER_ID = "<unnamed>";
+    private static final String UNNAMED_CLASSIFIER_ID = "<unnamed class>";
+    private static final String UNNAMED_ENUM_ID       = "<unnamed enumeration>";
 
     public interface PublicApiHandler {
         void onPublicApi(AstNode node, String id, List<Token> comments);
@@ -101,6 +103,7 @@ public abstract class AbstractCxxPublicApiVisitor<GRAMMAR extends Grammar>
         subscribeTo(CxxGrammarImpl.functionDefinition);
         subscribeTo(CxxGrammarImpl.enumSpecifier);
         subscribeTo(CxxGrammarImpl.initDeclaratorList);
+        subscribeTo(CxxGrammarImpl.aliasDeclaration);
     }
 
     @Override
@@ -151,6 +154,9 @@ public abstract class AbstractCxxPublicApiVisitor<GRAMMAR extends Grammar>
         case initDeclaratorList:
             visitDeclaratorList(astNode);
             break;
+        case aliasDeclaration:
+            visitAliasDeclaration(astNode);
+            break;
         default:
             // should not happen
             LOG.error("Visiting unknown node: " + astNode.getType());
@@ -184,6 +190,11 @@ public abstract class AbstractCxxPublicApiVisitor<GRAMMAR extends Grammar>
             return;
         }
 
+        // ignore friend declarations
+        if (isFriendDeclaration(declaratorList)) {
+            return;
+        }
+
         AstNode declaration = declaratorList
                 .getFirstAncestor(CxxGrammarImpl.declaration);
 
@@ -202,6 +213,36 @@ public abstract class AbstractCxxPublicApiVisitor<GRAMMAR extends Grammar>
                 visitDeclarator(declarator, declarator);
             }
         }
+    }
+
+    private boolean isFriendDeclaration(AstNode declaratorList) {
+        AstNode simpleDeclNode = declaratorList
+                .getFirstAncestor(CxxGrammarImpl.simpleDeclaration);
+
+        if (simpleDeclNode == null) {
+            LOG.warn("No simple declaration found for declarator list at {}",
+                    declaratorList.getTokenLine());
+            return false;
+        }
+
+        AstNode simpleDeclSpecifierSeq = simpleDeclNode
+                .getFirstChild(CxxGrammarImpl.simpleDeclSpecifierSeq);
+
+        if (simpleDeclSpecifierSeq == null) {
+            return false;
+        }
+
+        List<AstNode> declSpecifiers = simpleDeclSpecifierSeq
+                .getChildren(CxxGrammarImpl.declSpecifier);
+
+        for (AstNode declSpecifier : declSpecifiers) {
+            AstNode friendNode = declSpecifier.getFirstChild(CxxKeyword.FRIEND);
+            if (friendNode != null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void visitSingleDeclarator(AstNode declaration,
@@ -342,9 +383,48 @@ public abstract class AbstractCxxPublicApiVisitor<GRAMMAR extends Grammar>
     }
 
     private void visitFunctionDefinition(AstNode functionDef) {
-        visitMemberDeclarator(functionDef);
+        if (isPublicApiMember(functionDef)) {
+            // filter out deleted and defaulted methods
+            AstNode functionBodyNode = functionDef
+                    .getFirstChild(CxxGrammarImpl.functionBody);
+
+            if (functionBodyNode != null) {
+                if (isDefaultOrDeleteFunctionBody(functionBodyNode)) {
+                    return;
+                }
+            }
+
+            visitMemberDeclarator(functionDef);
+        }
     }
 
+    private boolean isDefaultOrDeleteFunctionBody(AstNode functionBodyNode) {
+        boolean defaultOrDelete = false;
+        List<AstNode> functionBody = functionBodyNode.getChildren();
+
+        // look for exact sub AST
+        if (functionBody.size() == 3) {
+            if (functionBody.get(0).is(CxxPunctuator.ASSIGN)
+                    && functionBody.get(2).is(CxxPunctuator.SEMICOLON)) {
+
+                AstNode bodyType = functionBody.get(1);
+
+                if (bodyType.is(CxxKeyword.DELETE)
+                        || bodyType.is(CxxKeyword.DEFAULT)) {
+                    defaultOrDelete = true;
+                }
+            }
+        }
+
+        return defaultOrDelete;
+    }
+    
+    /**
+     * Find documentation node, associated documentation,
+     * identifier of a <em>public</em> member declarator and visit it
+     * as a public API. 
+     * @param node the <em>public</em> member declarator to visit
+     */
     private void visitMemberDeclarator(AstNode node) {
 
         AstNode container = node.getFirstAncestor(
@@ -403,18 +483,45 @@ public abstract class AbstractCxxPublicApiVisitor<GRAMMAR extends Grammar>
         }
     }
 
+    private void visitAliasDeclaration(AstNode aliasDeclNode) {
+        if (isPublicApiMember(aliasDeclNode)) {
+            logDebug("AliasDeclaration");
+
+            AstNode aliasDeclIdNode = aliasDeclNode
+                    .getFirstDescendant(GenericTokenType.IDENTIFIER);
+
+            if (aliasDeclIdNode == null) {
+                LOG.error("No identifier found at " + aliasDeclNode.getTokenLine());
+            }
+            else {
+                // look for block documentation
+                List<Token> comments = getBlockDocumentation(aliasDeclNode);
+
+                // documentation may be inlined
+                if (comments.isEmpty()) {
+                    comments = getDeclaratorInlineComment(aliasDeclNode);
+                }
+
+                visitPublicApi(aliasDeclNode, aliasDeclIdNode.getTokenValue(),
+                        comments);
+            }
+        }
+    }
+
     private void visitEnumSpecifier(AstNode enumSpecifierNode) {
+        AstNode enumIdNode = enumSpecifierNode.getFirstDescendant(
+                GenericTokenType.IDENTIFIER);
+
+        String enumId = (enumIdNode == null)?
+                UNNAMED_ENUM_ID : enumIdNode.getTokenValue();
+
         if (!isPublicApiMember(enumSpecifierNode)) {
-            logDebug(enumSpecifierNode.getFirstDescendant(
-                    GenericTokenType.IDENTIFIER).getTokenValue()
-                    + " not in public API");
+            logDebug(enumId + " not in public API");
             return;
         }
 
         visitPublicApi(
-                enumSpecifierNode,
-                enumSpecifierNode.getFirstDescendant(
-                        GenericTokenType.IDENTIFIER).getTokenValue(),
+                enumSpecifierNode, enumId,
                 getBlockDocumentation(enumSpecifierNode));
 
         // deal with enumeration values

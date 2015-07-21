@@ -27,15 +27,33 @@ import org.sonar.cxx.parser.CxxGrammarImpl;
 import org.sonar.squidbridge.api.SourceFunction;
 import org.sonar.squidbridge.checks.ChecksHelper;
 import org.sonar.squidbridge.checks.SquidCheck;
-
 import com.sonar.sslr.api.AstNode;
 import com.sonar.sslr.api.Grammar;
+import org.sonar.api.server.rule.RulesDefinition;
+import org.sonar.squidbridge.annotations.ActivatedByDefault;
+import org.sonar.squidbridge.annotations.SqaleLinearWithOffsetRemediation;
+import org.sonar.squidbridge.annotations.SqaleSubCharacteristic;
+import org.sonar.squidbridge.annotations.Tags;
 
-@Rule(key = "FunctionCyclomaticComplexity", priority = Priority.MAJOR)
+@Rule(
+  key = "FunctionComplexity",
+  name = "Functions should not be too complex",
+  tags = {Tags.BRAIN_OVERLOAD},
+  priority = Priority.MAJOR)
+@ActivatedByDefault
+@SqaleSubCharacteristic(RulesDefinition.SubCharacteristics.UNIT_TESTABILITY)
+@SqaleLinearWithOffsetRemediation(
+  coeff = "1min",
+  offset = "10min",
+  effortToFixDescription = "per complexity point above the threshold")
 public class FunctionComplexityCheck extends SquidCheck<Grammar> {
+
   private static final int DEFAULT_MAX = 10;
 
-  @RuleProperty(defaultValue = "" + DEFAULT_MAX)
+  @RuleProperty(
+    key = "max",
+    description = "Maximum complexity allowed",
+    defaultValue = "" + DEFAULT_MAX)
   private int max = DEFAULT_MAX;
 
   @Override
@@ -49,10 +67,10 @@ public class FunctionComplexityCheck extends SquidCheck<Grammar> {
     int complexity = ChecksHelper.getRecursiveMeasureInt(sourceFunction, CxxMetric.COMPLEXITY);
     if (complexity > max) {
       getContext().createLineViolation(this,
-          "The Cyclomatic Complexity of this function is {0,number,integer} which is greater than {1,number,integer} authorized.",
-          node,
-          complexity,
-          max);
+        "The Cyclomatic Complexity of this function is {0,number,integer} which is greater than {1,number,integer} authorized.",
+        node,
+        complexity,
+        max);
     }
   }
 

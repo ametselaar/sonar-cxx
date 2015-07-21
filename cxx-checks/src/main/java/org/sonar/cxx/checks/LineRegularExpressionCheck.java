@@ -26,28 +26,31 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import com.google.common.io.Files;
-
-import org.sonar.check.Cardinality;
 import org.sonar.check.Priority;
 import org.sonar.check.Rule;
 import org.sonar.check.RuleProperty;
 import com.sonar.sslr.api.Grammar;
-import org.sonar.api.utils.SonarException;
+import org.sonar.api.utils.SonarException; //@todo: deprecated, see http://javadocs.sonarsource.org/4.5.2/apidocs/deprecated-list.html
 import org.sonar.cxx.visitors.CxxCharsetAwareVisitor;
 import org.sonar.squidbridge.checks.SquidCheck;
 import org.sonar.api.utils.PathUtils;
 import org.sonar.api.utils.WildcardPattern;
 import com.sonar.sslr.api.AstNode;
+import org.sonar.squidbridge.annotations.NoSqale;
+import org.sonar.squidbridge.annotations.RuleTemplate;
 
 @Rule(
   key = "LineRegularExpression",
-  cardinality = Cardinality.MULTIPLE,
+  name = "Line RegEx rule",
   priority = Priority.MAJOR)
-
+@RuleTemplate
+@NoSqale
 public class LineRegularExpressionCheck extends SquidCheck<Grammar> implements CxxCharsetAwareVisitor {
 
   private static final String DEFAULT_MATCH_FILE_PATTERN = "";
+  private static final boolean DEFAULT_INVERT_FILE_PATTERN = false;
   private static final String DEFAULT_REGULAR_EXPRESSION = "";
+  private static final boolean DEFAULT_INVERT_REGULAR_EXPRESSION = false;
   private static final String DEFAULT_MESSAGE = "The regular expression matches this line";
 
   private Charset charset;
@@ -55,16 +58,31 @@ public class LineRegularExpressionCheck extends SquidCheck<Grammar> implements C
 
   @RuleProperty(
     key = "matchFilePattern",
+    description = "Ant-style matching patterns for path",
     defaultValue = DEFAULT_MATCH_FILE_PATTERN)
   public String matchFilePattern = DEFAULT_MATCH_FILE_PATTERN;
 
   @RuleProperty(
+    key = "invertFilePattern",
+    description = "Invert file pattern comparison",
+    defaultValue = "" + DEFAULT_INVERT_FILE_PATTERN)
+  public boolean invertFilePattern = DEFAULT_INVERT_FILE_PATTERN;
+
+  @RuleProperty(
     key = "regularExpression",
+    description = "The regular expression",
     defaultValue = DEFAULT_REGULAR_EXPRESSION)
   public String regularExpression = DEFAULT_REGULAR_EXPRESSION;
 
   @RuleProperty(
+    key = "invertRegularExpression",
+    description = "Invert regular expression comparison",
+    defaultValue = "" + DEFAULT_INVERT_REGULAR_EXPRESSION)
+  public boolean invertRegularExpression = DEFAULT_INVERT_REGULAR_EXPRESSION;
+
+  @RuleProperty(
     key = "message",
+    description = "The violation message",
     defaultValue = DEFAULT_MESSAGE)
   public String message = DEFAULT_MESSAGE;
 
@@ -73,7 +91,7 @@ public class LineRegularExpressionCheck extends SquidCheck<Grammar> implements C
     try {
       pattern = Pattern.compile(regularExpression);
     } catch (PatternSyntaxException e) {
-      throw new SonarException(e);
+      throw new SonarException(e); //@todo SonarException has been deprecated, see http://javadocs.sonarsource.org/4.5.2/apidocs/deprecated-list.html
     }
   }
 
@@ -85,16 +103,16 @@ public class LineRegularExpressionCheck extends SquidCheck<Grammar> implements C
   @Override
   public void visitFile(AstNode fileNode) {
     if (fileNode != null) {
-      if (matchFile()) {
+      if (compare(invertFilePattern, matchFile())) {
         List<String> lines;
         try {
           lines = Files.readLines(getContext().getFile(), charset);
         } catch (IOException e) {
-          throw new SonarException(e);
+          throw new SonarException(e); //@todo SonarException has been deprecated, see http://javadocs.sonarsource.org/4.5.2/apidocs/deprecated-list.html
         }
         for (int i = 0; i < lines.size(); ++i) {
           Matcher matcher = pattern.matcher(lines.get(i));
-          if (matcher.find()) {
+          if (compare(invertRegularExpression, matcher.find())) {
             getContext().createLineViolation(this, message, i + 1);
           }
         }
@@ -111,4 +129,7 @@ public class LineRegularExpressionCheck extends SquidCheck<Grammar> implements C
     return true;
   }
 
+  private boolean compare(boolean invert, boolean condition) {
+    return invert ? !condition : condition;
+  }
 }

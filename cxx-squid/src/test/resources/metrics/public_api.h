@@ -11,6 +11,9 @@ class testClass
 public:
 	// comment
 	
+	/// aliasDeclaration
+	using aliasDeclaration = int;
+
 	/** publicMethod doc */
 	void publicMethod();
 	
@@ -32,6 +35,22 @@ public:
 	
 	int attr1, //!< attr1 doc 
 	attr2; ///< attr2 doc
+
+	// ignore friend declaration
+	template<typename S> friend S& operator<<(S&, A const&);
+
+	friend class friendClass;
+
+  // ignore deleted methods
+	A(A const&) = delete;
+
+  // ignore defaulted methods
+	A& operator=(A const&) = default;
+
+	/**
+	 * publicDefinedMethod comment
+	 */
+	void publicDefinedMethod() { }
 protected:
 	/**
 	 protectedMethod doc
@@ -76,6 +95,8 @@ private:
 		int u;
 	};
 	
+	using privateAliasDeclaration = int;
+
 public:
 	int inlineCommentedLastAttr; //!< inlineCommentedLastAttr comment
 };
@@ -92,6 +113,9 @@ struct testStruct {
      * bitfield doc
      */
     unsigned int bitfield:1;
+
+private:
+    void private_def(){}
 };
 
 /**
@@ -113,6 +137,8 @@ globalVar3; /*!< globalVar3 doc */
 void testFunction();
 
 void testFunction2(); //!< testFunction2 doc
+
+using globalAliasDeclaration = int; ///< inline globalAliasDeclaration
 
 typedef int testType; ///< testType doc
 

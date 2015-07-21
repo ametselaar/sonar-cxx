@@ -74,6 +74,8 @@ public class DeclaratorsTest extends ParserBaseTest {
     assertThat(p).matches("tword[20]");
     assertThat(p).matches("*what() throw()");
     assertThat(p).matches("foo(string, bool)");
+    assertThat(p).matches("foo(const string p1, bool p2)");
+    assertThat(p).matches("foo(const string &p1, bool p2)");
   }
 
   @Test
@@ -372,6 +374,10 @@ public class DeclaratorsTest extends ParserBaseTest {
     assertThat(p).matches("string");
     assertThat(p).matches("::P& c");
     assertThat(p).matches("bool (A::*bar)(void)");
+    // CLI extension
+    assertThat(p).matches("const int^ i");
+    assertThat(p).matches("const int% i");
+    assertThat(p).matches("const int^% i");
   }
 
   @Test
@@ -406,6 +412,12 @@ public class DeclaratorsTest extends ParserBaseTest {
     assertThat(p).matches("virtual const char* what() const throw() { return \"read empty stack\"; }");
     assertThat(p).matches("void foo() override {}");
     assertThat(p).matches("void foo(::P& c) {}");
+    assertThat(p).matches("auto equal_range(ForwardIterator first, ForwardIterator last, const Type& value) -> std::pair<ForwardIterator, ForwardIterator> { return pair; }");
+    assertThat(p).matches("auto to_string(int value) -> std::string { return \"\"; }");
+    assertThat(p).matches("auto size() const -> std::size_t { return 0; }");
+//  ToDo : make this work
+//    assertThat(p).matches("auto str() const -> const char* { return nullptr; }");
+//    assertThat(p).matches("auto std::map::at(const key_type& key) -> mapped_type& { return value; }");
   }
 
   @Test

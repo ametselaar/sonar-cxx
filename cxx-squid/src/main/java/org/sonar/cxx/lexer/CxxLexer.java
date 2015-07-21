@@ -34,7 +34,7 @@ import org.sonar.cxx.channels.CharacterLiteralsChannel;
 import org.sonar.cxx.channels.PreprocessorChannel;
 import org.sonar.cxx.channels.StringLiteralsChannel;
 
-import com.sonar.sslr.api.Preprocessor;
+import com.sonar.sslr.api.Preprocessor; //@todo: deprecated, see http://javadocs.sonarsource.org/4.5.2/apidocs/deprecated-list.html
 import com.sonar.sslr.impl.Lexer;
 import com.sonar.sslr.impl.channel.BlackHoleChannel;
 import com.sonar.sslr.impl.channel.IdentifierAndKeywordChannel;
@@ -86,6 +86,7 @@ public final class CxxLexer {
         .withChannel(regexp(CxxTokenType.NUMBER, "[1-9][0-9]*+" + opt(INTEGER_SUFFIX))) // Decimal literals
         .withChannel(regexp(CxxTokenType.NUMBER, "0[0-7]++" + opt(INTEGER_SUFFIX))) // Octal Literals
         .withChannel(regexp(CxxTokenType.NUMBER, "0[xX][0-9a-fA-F]++" + opt(INTEGER_SUFFIX))) // Hex Literals
+        .withChannel(regexp(CxxTokenType.NUMBER, "0[bB][01]++" + opt(INTEGER_SUFFIX))) // Binary Literals
         .withChannel(regexp(CxxTokenType.NUMBER, "0" + opt(INTEGER_SUFFIX))) // Decimal zero
 
         // C++ Standard, Section 2.14.7 "Pointer literals"

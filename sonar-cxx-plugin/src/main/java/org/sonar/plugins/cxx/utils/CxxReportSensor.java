@@ -20,15 +20,18 @@
 package org.sonar.plugins.cxx.utils;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Set;
 
 import org.apache.tools.ant.DirectoryScanner;
+import org.apache.commons.io.FilenameUtils;
 import org.sonar.api.batch.Sensor;
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.batch.fs.FileSystem;
 import org.sonar.api.component.ResourcePerspectives;
+import org.sonar.api.batch.bootstrap.ProjectReactor;
 import org.sonar.api.config.Settings;
 import org.sonar.api.issue.Issuable;
 import org.sonar.api.issue.Issue;
@@ -37,8 +40,7 @@ import org.sonar.api.measures.Metric;
 import org.sonar.api.resources.Project;
 import org.sonar.api.resources.Resource;
 import org.sonar.api.rule.RuleKey;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
-import org.sonar.api.utils.SonarException;
+import org.sonar.api.utils.SonarException; //@todo: deprecated, see http://javadocs.sonarsource.org/4.5.2/apidocs/deprecated-list.html
 import org.sonar.plugins.cxx.CxxLanguage;
 
 /**
@@ -53,17 +55,19 @@ public abstract class CxxReportSensor implements Sensor {
   private final Metric metric;
   private int violationsCount;
 
-  protected ModuleFileSystem fs;
+  protected FileSystem fs;
   protected Settings conf;
+  private final ProjectReactor reactor;
 
   /**
    * Use this constructor if you dont have to save violations aka issues
    *
    * @param conf the Settings object used to access the configuration properties
    * @param fs   file system access layer
+   * @param reactor
    */
-  protected CxxReportSensor(Settings conf, ModuleFileSystem fs) {
-    this(null, conf, fs, null);
+  protected CxxReportSensor(Settings conf, FileSystem fs, ProjectReactor reactor) {
+    this(null, conf, fs, reactor, null);
   }
 
   /**
@@ -74,55 +78,61 @@ public abstract class CxxReportSensor implements Sensor {
    * @param fs           file system access layer
    * @param metric       this metrics will be used to save a measure of the overall
    *                     issue count. Pass 'null' to skip this.
+   * @param reactor
    */
-  protected CxxReportSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs, Metric metric) {
-    this.perspectives = perspectives;
+  protected CxxReportSensor(ResourcePerspectives perspectives, Settings conf, FileSystem fs, ProjectReactor reactor, Metric metric) {
     this.conf = conf;
     this.fs = fs;
     this.metric = metric;
+    this.reactor = reactor;
+    this.perspectives = perspectives;
   }
 
   /**
    * {@inheritDoc}
    */
   public boolean shouldExecuteOnProject(Project project) {
-    return !project.getFileSystem().mainFiles(CxxLanguage.KEY).isEmpty();
+    return fs.hasFiles(fs.predicates().hasLanguage(CxxLanguage.KEY))
+      && conf.hasKey(reportPathKey());
   }
-
+  
   /**
    * {@inheritDoc}
    */
   public void analyse(Project project, SensorContext context) {
-    try {
-      List<File> reports = getReports(conf, fs.baseDir().getPath(),
-          reportPathKey(), defaultReportPath());
+    if (!CxxUtils.isReactorProject(project)) {
+      try {
+        List<File> reports = getReports(conf,
+          reactor.getRoot().getBaseDir().getCanonicalPath(),
+          fs.baseDir().getPath(),
+          reportPathKey());
+        violationsCount = 0;
 
-      violationsCount = 0;
-
-      for (File report : reports) {
-        CxxUtils.LOG.info("Processing report '{}'", report);
-        try{
-          int prevViolationsCount = violationsCount;
-          processReport(project, context, report);
-          CxxUtils.LOG.info("{} processed = {}", metric == null ? "Issues" : metric.getName(),
-                            violationsCount - prevViolationsCount);
-        } catch(EmptyReportException e){
-          CxxUtils.LOG.warn("The report '{}' seems to be empty, ignoring.", report);
+        for (File report : reports) {
+          CxxUtils.LOG.info("Processing report '{}'", report);
+          try {
+            int prevViolationsCount = violationsCount;
+            processReport(project, context, report);
+            CxxUtils.LOG.info("{} processed = {}", metric == null ? "Issues" : metric.getName(),
+              violationsCount - prevViolationsCount);
+          } catch (EmptyReportException e) {
+            CxxUtils.LOG.warn("The report '{}' seems to be empty, ignoring.", report);
+          }
         }
-      }
 
-      if (metric != null) {
-        Measure measure = new Measure(metric);
-        measure.setIntValue(violationsCount);
-        context.saveMeasure(measure);
-      }
-    } catch (Exception e) {
-      String msg = new StringBuilder()
+        if (metric != null) {
+          Measure measure = new Measure(metric);
+          measure.setIntValue(violationsCount);
+          context.saveMeasure(measure);
+        }
+      } catch (Exception e) {
+        String msg = new StringBuilder()
           .append("Cannot feed the data into sonar, details: '")
           .append(e)
           .append("'")
           .toString();
-      throw new SonarException(msg, e);
+        throw new SonarException(msg, e); //@todo SonarException has been deprecated, see http://javadocs.sonarsource.org/4.5.2/apidocs/deprecated-list.html
+      }
     }
   }
 
@@ -138,28 +148,58 @@ public abstract class CxxReportSensor implements Sensor {
       return value;
   }
 
-  protected List<File> getReports(Settings conf,
-      String baseDirPath,
-      String reportPathPropertyKey,
-      String defaultReportPath) {
+  public static List<File> getReports(Settings conf,
+    String baseDirPath1,
+    String baseDirPath2,
+    String reportPathPropertyKey) {
     String reportPath = conf.getString(reportPathPropertyKey);
-    if (reportPath == null) {
-      reportPath = defaultReportPath;
-    }
-
-    CxxUtils.LOG.debug("Using pattern '{}' to find reports", reportPath);
-
-    DirectoryScanner scanner = new DirectoryScanner();
-    String[] includes = new String[1];
-    includes[0] = reportPath;
-    scanner.setIncludes(includes);
-    scanner.setBasedir(new File(baseDirPath));
-    scanner.scan();
-    String[] relPaths = scanner.getIncludedFiles();
-
     List<File> reports = new ArrayList<File>();
-    for (String relPath : relPaths) {
-      reports.add(new File(baseDirPath, relPath));
+    if (reportPath != null && !reportPath.isEmpty()) {
+      reportPath = FilenameUtils.normalize(reportPath);
+      CxxUtils.LOG.debug("Using pattern '{}' to find reports", reportPath);
+
+      DirectoryScanner scanner = new DirectoryScanner();
+      String[] includes = new String[1];
+      includes[0] = reportPath;
+      scanner.setIncludes(includes);
+      String baseDirPath = baseDirPath1;
+      scanner.setBasedir(new File(baseDirPath));
+      String[] relPaths = new String[0];
+      try {
+        scanner.scan();
+        relPaths = scanner.getIncludedFiles();
+      } catch (IllegalStateException e) {
+        CxxUtils.LOG.error("Invalid report baseDir '{}'", baseDirPath);
+      }
+      if (relPaths.length < 1 && !baseDirPath2.isEmpty()) {
+        baseDirPath = baseDirPath2;
+        scanner.setBasedir(new File(baseDirPath));
+        try {
+          scanner.scan();
+          relPaths = scanner.getIncludedFiles();
+        } catch (IllegalStateException e) {
+          CxxUtils.LOG.error("Invalid report baseDir '{}'", baseDirPath);
+        }
+      }
+      
+      for (String relPath : relPaths) {
+        String path = CxxUtils.normalizePath(new File(baseDirPath, relPath).getAbsolutePath());
+        try {
+          File reportFile = new File(path);
+          if (reportFile.exists()) {
+            reports.add(reportFile);
+          } else {
+            CxxUtils.LOG.error("Can't read report '{}'", path);
+          }
+        } catch (SecurityException e) {
+          CxxUtils.LOG.error("Read access to report '{}' denied", path);
+        }
+      }
+      if (reports.isEmpty()) {
+        CxxUtils.LOG.warn("Cannot find a report for '{}={}'", reportPathPropertyKey, reportPath);
+      }
+    } else {
+      CxxUtils.LOG.error("Undefined report path value for key '{}'", reportPathPropertyKey);
     }
 
     return reports;
@@ -190,9 +230,10 @@ public abstract class CxxReportSensor implements Sensor {
     boolean add = false;
     Resource resource = null;
     int lineNr = 0;
-
-    if ((filename != null) && (filename.length() > 0)) { // file level
-      String normalPath = CxxUtils.normalizePath(filename);
+    // handles file="" situation -- file level
+    if ((filename != null) && (filename.length() > 0)) {
+      String root = reactor.getRoot().getBaseDir().getAbsolutePath();
+      String normalPath = CxxUtils.normalizePathFull(filename, root);
       if (normalPath != null && !notFoundFiles.contains(normalPath)) {
         org.sonar.api.resources.File file
           = org.sonar.api.resources.File.fromIOFile(new File(normalPath), project);
@@ -253,16 +294,12 @@ public abstract class CxxReportSensor implements Sensor {
     return lineNr;
   }
 
-  protected void processReport(Project project, SensorContext context, File report)
+  protected void processReport(final Project project, final SensorContext context, File report)
       throws Exception
   {
   }
 
   protected String reportPathKey() {
-    return "";
-  }
-
-  protected String defaultReportPath() {
     return "";
   }
 }

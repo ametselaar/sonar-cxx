@@ -19,22 +19,17 @@
  */
 package org.sonar.plugins.cxx.utils;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import java.io.File;
-import java.util.LinkedList;
 import java.util.List;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.batch.fs.FileSystem;
+
 import org.sonar.api.config.Settings;
-import org.sonar.api.resources.InputFile;
 import org.sonar.api.resources.Project;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
-import org.sonar.plugins.cxx.CxxLanguage;
 import org.sonar.plugins.cxx.TestUtils;
+import org.sonar.api.batch.bootstrap.ProjectReactor;
 
 public class CxxReportSensorTest {
   private final String VALID_REPORT_PATH = "cppcheck-reports/cppcheck-result-*.xml";
@@ -42,8 +37,8 @@ public class CxxReportSensorTest {
   private final String REPORT_PATH_PROPERTY_KEY = "cxx.reportPath";
 
   private class CxxReportSensorImpl extends CxxReportSensor {
-    public CxxReportSensorImpl(Settings settings, ModuleFileSystem fs){
-      super(settings, fs);
+    public CxxReportSensorImpl(Settings settings, FileSystem fs, ProjectReactor reactor){
+      super(settings, fs, reactor);
     }
 
     @Override
@@ -54,13 +49,16 @@ public class CxxReportSensorTest {
   private CxxReportSensor sensor;
   private File baseDir;
   private Settings settings;
-  private ModuleFileSystem fs;
+  private static FileSystem fs;
+  private ProjectReactor reactor;
 
   @Before
   public void init() {
     settings = new Settings();
     fs = TestUtils.mockFileSystem();
-    sensor = new CxxReportSensorImpl(settings, fs);
+    reactor = TestUtils.mockReactor();
+    
+    sensor = new CxxReportSensorImpl(settings, fs, reactor);
     try {
       baseDir = new File(getClass().getResource("/org/sonar/plugins/cxx/reports-project/").toURI());
     } catch (java.net.URISyntaxException e) {
@@ -70,51 +68,49 @@ public class CxxReportSensorTest {
 
   @Test
   public void shouldntThrowWhenInstantiating() {
-    new CxxReportSensorImpl(settings, fs);
+    new CxxReportSensorImpl(settings, fs, reactor);
   }
 
   @Test
-  public void shouldAllwaysExecute() {
-    // which means: only on cxx projects
-    CxxReportSensor sensor = new CxxReportSensorImpl(settings, fs);
-    Project cxxProject = mockProjectWithSomeFiles(CxxLanguage.KEY);
-    Project foreignProject = mockProjectWithLanguageKey("whatever");
-    assert (sensor.shouldExecuteOnProject(cxxProject));
-  }
-
-  @Test
-  public void getReports_shouldFindSomethingIfThere() {
-    List<File> reports = sensor.getReports(settings, baseDir.getPath(),
-        "", VALID_REPORT_PATH);
-    assertFound(reports);
-  }
-
-  @Test
-  public void getReports_shouldFindNothingIfNotThere() {
-    List<File> reports = sensor.getReports(new Settings(), baseDir.getPath(),
-        "", INVALID_REPORT_PATH);
-    assertNotFound(reports);
-  }
-
-  @Test
-  public void getReports_shouldUseConfigurationWithHigherPriority() {
-    // we'll detect this condition by passing something not existing as config property
-    // and something existing as default. The result is 'found nothing' because the
-    // config has been used
+  public void getReports_shouldFindNothingIfNoKey() {
     settings.setProperty(REPORT_PATH_PROPERTY_KEY, INVALID_REPORT_PATH);
-
-    List<File> reports = sensor.getReports(settings, baseDir.getPath(),
-        REPORT_PATH_PROPERTY_KEY, VALID_REPORT_PATH);
+    List<File> reports = sensor.getReports(settings, baseDir.getPath(), "",
+      "");
     assertNotFound(reports);
   }
 
   @Test
-  public void getReports_shouldFallbackToDefaultIfNothingConfigured() {
-    List<File> reports = sensor.getReports(settings, baseDir.getPath(),
-        REPORT_PATH_PROPERTY_KEY, VALID_REPORT_PATH);
+  public void getReports_shouldFindNothingIfNoPath() {
+    settings.setProperty(REPORT_PATH_PROPERTY_KEY, "");
+    List<File> reports = sensor.getReports(settings, baseDir.getPath(), "",
+      REPORT_PATH_PROPERTY_KEY);
+    assertNotFound(reports);
+  }
+
+  @Test
+  public void getReports_shouldFindNothingIfInvalidPath() {
+    settings.setProperty(REPORT_PATH_PROPERTY_KEY, INVALID_REPORT_PATH);
+    List<File> reports = sensor.getReports(settings, baseDir.getPath(), "",
+      REPORT_PATH_PROPERTY_KEY);
+    assertNotFound(reports);
+  }
+
+  @Test
+  public void getReports_shouldFindSomethingBaseDir1() {
+    settings.setProperty(REPORT_PATH_PROPERTY_KEY, VALID_REPORT_PATH);
+    List<File> reports = sensor.getReports(settings, baseDir.getPath(), "",
+      REPORT_PATH_PROPERTY_KEY);
     assertFound(reports);
   }
 
+  @Test
+  public void getReports_shouldFindSomethingBaseDir2() {
+    settings.setProperty(REPORT_PATH_PROPERTY_KEY, VALID_REPORT_PATH);
+    List<File> reports = sensor.getReports(settings, baseDir.getPath()+"Invalid", baseDir.getPath(),
+      REPORT_PATH_PROPERTY_KEY);
+    assertFound(reports);
+  }
+  
   @Test
   public void savesACorrectLineLevelViolation() {
     // assert(sensor.saveViolation(??, ??, rulerepokey, "existingfile",
@@ -162,19 +158,4 @@ public class CxxReportSensorTest {
     assert (reports != null);
   }
 
-  private static Project mockProjectWithLanguageKey(String languageKey) {
-    Project project = TestUtils.mockProject();
-    when(project.getLanguageKey()).thenReturn(languageKey);
-    return project;
-  }
-
-  private static Project mockProjectWithSomeFiles(String languageKey) {
-    Project project = TestUtils.mockProject();
-    List<InputFile> listofFiles = new LinkedList<InputFile>();
-    InputFile inputFile = mock(InputFile.class);
-    listofFiles.add(0, inputFile);
-    when(project.getLanguageKey()).thenReturn(languageKey);
-    when(project.getFileSystem().mainFiles(languageKey)).thenReturn(listofFiles);
-    return project;
-  }
 }

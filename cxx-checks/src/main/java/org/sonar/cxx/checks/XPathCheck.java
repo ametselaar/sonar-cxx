@@ -20,38 +20,51 @@
 package org.sonar.cxx.checks;
 
 import com.sonar.sslr.api.AstNode;
-import org.sonar.check.Cardinality;
 import org.sonar.check.Priority;
 import org.sonar.check.Rule;
 import org.sonar.check.RuleProperty;
 import org.sonar.squidbridge.checks.AbstractXPathCheck;
-
 import com.sonar.sslr.api.Grammar;
 import org.sonar.api.utils.PathUtils;
 import org.sonar.api.utils.WildcardPattern;
+import org.sonar.squidbridge.annotations.NoSqale;
+import org.sonar.squidbridge.annotations.RuleTemplate;
 
 @Rule(
   key = "XPath",
-  priority = Priority.MAJOR,
-  cardinality = Cardinality.MULTIPLE)
+  name = "XPath rule",
+  priority = Priority.MAJOR)
+@RuleTemplate
+@NoSqale
 public class XPathCheck extends AbstractXPathCheck<Grammar> {
 
   private static final String DEFAULT_MATCH_FILE_PATTERN = "";
+  private static final boolean DEFAULT_INVERT_FILE_PATTERN = false;
   private static final String DEFAULT_XPATH_QUERY = "";
   private static final String DEFAULT_MESSAGE = "The XPath expression matches this piece of code";
 
   @RuleProperty(
     key = "matchFilePattern",
+    description = "Ant-style matching patterns for path",
     defaultValue = DEFAULT_MATCH_FILE_PATTERN)
   public String matchFilePattern = DEFAULT_MATCH_FILE_PATTERN;
 
   @RuleProperty(
+    key = "invertFilePattern",
+    description = "Invert file pattern comparison",
+    defaultValue = "" + DEFAULT_INVERT_FILE_PATTERN)
+  public boolean invertFilePattern = DEFAULT_INVERT_FILE_PATTERN;
+
+  @RuleProperty(
     key = "xpathQuery",
+    description = "The XPath query",
+    type = "TEXT",
     defaultValue = DEFAULT_XPATH_QUERY)
   public String xpathQuery = DEFAULT_XPATH_QUERY;
 
   @RuleProperty(
     key = "message",
+    description = "The violation message",
     defaultValue = DEFAULT_MESSAGE)
   public String message = DEFAULT_MESSAGE;
 
@@ -71,7 +84,7 @@ public class XPathCheck extends AbstractXPathCheck<Grammar> {
       if (!matchFilePattern.isEmpty()) {
         WildcardPattern pattern = WildcardPattern.create(matchFilePattern);
         String path = PathUtils.sanitize(getContext().getFile().getPath());
-        if (!pattern.match(path)) {
+        if (!compare(invertFilePattern, pattern.match(path))) {
           return;
         }
       }
@@ -79,4 +92,7 @@ public class XPathCheck extends AbstractXPathCheck<Grammar> {
     }
   }
 
+  private boolean compare(boolean invert, boolean condition) {
+    return invert ? !condition : condition;
+  }
 }

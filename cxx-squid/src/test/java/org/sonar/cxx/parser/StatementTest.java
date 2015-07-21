@@ -63,10 +63,10 @@ public class StatementTest extends ParserBaseTest {
     assertThat(p).matches("void foo(string, bool);");
     assertThat(p).matches("foo(int param, int=2);");
 
-    // 'bracket operator isnt welcome here' problem
+    // 'bracket operator isn't welcome here' problem
     assertThat(p).matches("foo(param1, instance()[1]);");
 
-    // 'decraring friend a class in the global namespace' problem
+    // 'declaring friend a class in the global namespace' problem
     assertThat(p).matches("friend class ::SMLCGroupHierarchyImpl;");
 
     // "'bitwise not' applied to a mask inside a namespace" problem
@@ -137,9 +137,7 @@ public class StatementTest extends ParserBaseTest {
     p.setRootRule(g.rule(CxxGrammarImpl.switchStatement));
 
     assertThat(p).matches("switch (0) { default : break; }");
-
-    //TODO: make this work.
-    //assertThat(p).matches("switch (0) { {default : break;} }");
+    assertThat(p).matches("switch (0) { {default : break;} }");
   }
 
 
@@ -201,6 +199,35 @@ public class StatementTest extends ParserBaseTest {
     p.setRootRule(g.rule(CxxGrammarImpl.iterationStatement));
 
     assertThat(p).matches("for (int i=1; i<=9; ++i) { coll.push_back(i); }");
+    
+    assertThat(p).matches("for (int i : v) { std::cout << i << ' '; }");
+    assertThat(p).matches("for (std::string i : v) { std::cout << i.c_str() << ' '; }");
+    assertThat(p).matches("for (auto i : v) { std::cout << i.c_str() << ' '; }");
+    assertThat(p).matches("for (const int i : v) { std::cout << i << ' '; }");
+    assertThat(p).matches("for (const std::string i : v) { std::cout << i.c_str() << ' '; }");
+    assertThat(p).matches("for (const auto i : v) { std::cout << i.c_str() << ' '; }");
+    
+    assertThat(p).matches("for (int& i : v) { std::cout << i << ' '; }");
+    assertThat(p).matches("for (std::string& i : v) { std::cout << i.c_str() << ' '; }");
+    assertThat(p).matches("for (auto& i : v) { std::cout << i.c_str() << ' '; }");
+    assertThat(p).matches("for (const int& i : v) { std::cout << i << ' '; }");
+    assertThat(p).matches("for (const std::string& i : v) { std::cout << i.c_str() << ' '; }");
+    assertThat(p).matches("for (const auto& i : v) { std::cout << i.c_str() << ' '; }");
+    
+    assertThat(p).matches("for (int&& i : v) { std::cout << i << ' '; }");
+    assertThat(p).matches("for (std::string&& i : v) { std::cout << i.c_str() << ' '; }");    
+    assertThat(p).matches("for (auto&& i : v) { std::cout << i.c_str() << ' '; }");    
+    assertThat(p).matches("for (const int&& i : v) { std::cout << i << ' '; }");
+    assertThat(p).matches("for (const std::string&& i : v) { std::cout << i.c_str() << ' '; }");    
+    assertThat(p).matches("for (const auto&& i : v) { std::cout << i.c_str() << ' '; }");    
+            
+    assertThat(p).matches("for(int n : {0,1,2,3,4,5}) {std::cout << n << ' ';}");
+    
+    assertThat(p).matches("for (XMLFluidPlacementEntry* entry: m_pipeFluidPlacementEntries->entries) {delete entry;}");
+    assertThat(p).matches("for (ICurveComparer* curveComparer : m_curveComparers) delete curveComparer;");
+    
+    // CLI extension
+    assertThat(p).matches("for each(String^% s in arr) { s = i++.ToString(); }");
   }
 
   @Test
@@ -213,12 +240,12 @@ public class StatementTest extends ParserBaseTest {
   public void forRangeDeclaration() {
     p.setRootRule(g.rule(CxxGrammarImpl.forRangeDeclaration));
 
-    g.rule(CxxGrammarImpl.forrangeDeclSpecifierSeq).mock();
+    g.rule(CxxGrammarImpl.forRangeDeclSpecifierSeq).mock();
     g.rule(CxxGrammarImpl.declarator).mock();
     g.rule(CxxGrammarImpl.attributeSpecifierSeq).mock();
 
-    assertThat(p).matches("forrangeDeclSpecifierSeq declarator");
-    assertThat(p).matches("attributeSpecifierSeq forrangeDeclSpecifierSeq declarator");
+    assertThat(p).matches("forRangeDeclSpecifierSeq declarator");
+    assertThat(p).matches("attributeSpecifierSeq forRangeDeclSpecifierSeq declarator");
   }
 
   @Test

@@ -25,14 +25,15 @@ import java.util.List;
 import org.jdom.Element;
 import org.jdom.input.SAXBuilder;
 import org.sonar.api.batch.SensorContext;
+import org.sonar.api.batch.fs.FileSystem;
 import org.sonar.api.component.ResourcePerspectives;
 import org.sonar.api.config.Settings;
 import org.sonar.api.profiles.RulesProfile;
 import org.sonar.api.resources.Project;
-import org.sonar.api.scan.filesystem.ModuleFileSystem;
 import org.sonar.plugins.cxx.utils.CxxMetrics;
 import org.sonar.plugins.cxx.utils.CxxReportSensor;
 import org.sonar.plugins.cxx.utils.CxxUtils;
+import org.sonar.api.batch.bootstrap.ProjectReactor;
 
 /**
  * {@inheritDoc}
@@ -40,14 +41,13 @@ import org.sonar.plugins.cxx.utils.CxxUtils;
 public final class CxxRatsSensor extends CxxReportSensor {
   private static final String MISSING_RATS_TYPE = "fixed size global buffer";
   public static final String REPORT_PATH_KEY = "sonar.cxx.rats.reportPath";
-  private static final String DEFAULT_REPORT_PATH = "rats-reports/rats-result-*.xml";
   private RulesProfile profile;
 
   /**
    * {@inheritDoc}
    */
-  public CxxRatsSensor(ResourcePerspectives perspectives, Settings conf, ModuleFileSystem fs, RulesProfile profile) {
-    super(perspectives, conf, fs, CxxMetrics.RATS);
+  public CxxRatsSensor(ResourcePerspectives perspectives, Settings conf, FileSystem fs, RulesProfile profile, ProjectReactor reactor) {
+    super(perspectives, conf, fs, reactor, CxxMetrics.RATS);
     this.profile = profile;
   }
 
@@ -66,14 +66,11 @@ public final class CxxRatsSensor extends CxxReportSensor {
   }
 
   @Override
-  protected String defaultReportPath() {
-    return DEFAULT_REPORT_PATH;
-  }
-
-  @Override
-  protected void processReport(Project project, SensorContext context, File report)
+  protected void processReport(final Project project, final SensorContext context, File report)
       throws org.jdom.JDOMException, java.io.IOException
   {
+    CxxUtils.LOG.info("Parsing 'RATS' format");
+    
     try
     {
       SAXBuilder builder = new SAXBuilder(false);
