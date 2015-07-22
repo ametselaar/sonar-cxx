@@ -836,29 +836,53 @@ public class CxxPreprocessor extends Preprocessor {
 
   private List<Token> evaluateHashhashOperators(List<Token> tokens) {
     List<Token> newTokens = new ArrayList<Token>();
+    String replacement = null;
+    Token pred = null;
+    List<Token> pendingWhitespace = new ArrayList<Token>();
 
     Iterator<Token> it = tokens.iterator();
     while (it.hasNext()) {
       Token curr = it.next();
       if ("##".equals(curr.getValue())) {
-        Token pred = predConcatToken(newTokens);
+        pendingWhitespace.clear();
         Token succ = succConcatToken(it);
-        String replacement = pred.getValue().replaceFirst("\\s*$", "") + succ.getValue().replaceFirst("^\\s*", "");
-        replacement = serialize(expandMacro("", replacement));
-        newTokens.add(Token.builder()
-            .setLine(pred.getLine())
-            .setColumn(pred.getColumn())
-            .setURI(pred.getURI())
-            .setValueAndOriginalValue(replacement)
-            .setType(pred.getType())
-            .setGeneratedCode(true)
-            .build());
-      } else {
+        if (null == pred) {
+          pred = predConcatToken(newTokens);
+          replacement = pred.getValue().replaceFirst("\\s*$", "") + succ.getValue().replaceFirst("^\\s*", "");
+        }
+        else {
+          replacement = replacement.replaceFirst("\\s*$", "") + succ.getValue().replaceFirst("^\\s*", "");
+        }
+      }
+      else if (WS == curr.getType()) {
+        pendingWhitespace.add(curr);
+      }
+      else {
+        flushConcatenation(newTokens, replacement, pred, pendingWhitespace);
+        pred = null;
         newTokens.add(curr);
       }
     }
+    flushConcatenation(newTokens, replacement, pred, pendingWhitespace);
 
     return newTokens;
+  }
+
+  private void flushConcatenation(List<Token> newTokens, String replacement,
+      Token pred, List<Token> pendingWhitespace) {
+    if (null != pred) {
+      String expansion = serialize(expandMacro("", replacement));
+      newTokens.add(Token.builder()
+          .setLine(pred.getLine())
+          .setColumn(pred.getColumn())
+          .setURI(pred.getURI())
+          .setValueAndOriginalValue(expansion)
+          .setType(pred.getType())
+          .setGeneratedCode(true)
+          .build());
+    }
+    newTokens.addAll(pendingWhitespace);
+    pendingWhitespace.clear();
   }
 
   private Token predConcatToken(List<Token> tokens) {

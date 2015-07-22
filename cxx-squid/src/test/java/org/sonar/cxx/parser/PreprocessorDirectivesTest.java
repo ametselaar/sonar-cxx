@@ -307,6 +307,12 @@ public class PreprocessorDirectivesTest extends ParserBaseTest {
       + "#define B(n) 0x##n\n"
       + "i = A;"))
       .equals("i = 0xcf ; EOF"));
+
+    assert (serialize(p.parse(
+      "#define A B(cf)\n"
+      + "#define B(n) 0##x##n\n"
+      + "i = A;"))
+      .equals("i = 0xcf ; EOF"));
   }
 
   @Test
