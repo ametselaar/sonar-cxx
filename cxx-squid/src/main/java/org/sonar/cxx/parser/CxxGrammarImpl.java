@@ -136,8 +136,9 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
   functionSpecifier,
   typedefName,
   typeSpecifier,
-  trailingTypeSpecifier,
   typeSpecifierSeq,
+  trailingTypeSpecifier,
+  trailingTypeSpecifierSeq,
   simpleTypeSpecifier,
   typeName,
   decltypeSpecifier,
@@ -827,6 +828,8 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
         )
       );
 
+    b.rule(trailingTypeSpecifierSeq).is(b.oneOrMore(trailingTypeSpecifier), b.optional(attributeSpecifierSeq));
+
     b.rule(trailingTypeSpecifier).is(
       b.firstOf(
         simpleTypeSpecifier,
@@ -1046,7 +1049,9 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
                                             b.optional(exceptionSpecification)
                                             );
 
-    b.rule(trailingReturnType).is("->", simpleTypeSpecifier);
+    b.rule(trailingReturnType).is(
+        b.sequence("->", b.oneOrMore(trailingTypeSpecifierSeq), b.optional(abstractDeclarator))
+    );
 
     b.rule(ptrOperator).is(
         b.firstOf(
@@ -1115,10 +1120,9 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
         b.firstOf(
             b.sequence(parameterDeclarationList, ",", "..."),
             b.sequence(b.optional(parameterDeclarationList), b.optional("...")),
-            cliParameterArray,
-                "..."
-            )
-            );
+            cliParameterArray
+        )
+        );
 
     b.rule(cliParameterArray).is(b.optional(attribute), "...", parameterDeclaration);
 
@@ -1126,7 +1130,6 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
 
     b.rule(parameterDeclaration).is(
         b.firstOf(
-            b.sequence(IDENTIFIER, "..."),// may occur in variadic templates
             b.sequence(b.optional(attributeSpecifierSeq), b.optional(vcAtlAttribute), parameterDeclSpecifierSeq, declarator, b.optional("=", initializerClause)),
             b.sequence(b.optional(attributeSpecifierSeq), parameterDeclSpecifierSeq, b.optional(abstractDeclarator), b.optional("=", initializerClause)))
         );
@@ -1134,7 +1137,7 @@ public enum CxxGrammarImpl implements GrammarRuleKey {
     b.rule(parameterDeclSpecifierSeq).is(
         b.zeroOrMore(
             b.nextNot(b.sequence(b.optional(declarator), b.firstOf("=", ")", ","))),
-            declSpecifier
+            b.sequence(declSpecifier, b.optional("..."))
         ),
         b.optional(attributeSpecifierSeq)
         );
