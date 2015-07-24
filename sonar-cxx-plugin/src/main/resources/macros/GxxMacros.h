@@ -18,8 +18,10 @@
 
 // Macro definitions to help parse g++ programs with sonar-cxx
 
-// Definions for predefined macros may be obtained with:
+// Definitions for predefined macros may be obtained with:
 // echo | cpp -x c++ -dM -
+// __GNUC__ and __GNUC_MINOR__ are used below to determine
+//   whether to define away some new c++11 keywords
 
 // Directories searched by default for include files may be obtained with:
 // echo | cpp -v -x c++ - | grep -e "^ "
@@ -61,5 +63,11 @@
 #define __typeof__ decltype
 #define __volatile volatile
 #define __volatile__ volatile
+
+// g++ versions prior to 4.7.0 do not support final and override
+#if defined(__GNUC__) && (__GNUC__ * 100 + __GNUC_MINOR__ < 407)
+#define final xfinal
+#define override xoverride
+#endif
 
 #endif
